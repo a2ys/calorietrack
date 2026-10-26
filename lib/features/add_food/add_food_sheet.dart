@@ -4,6 +4,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/barcode_lookup.dart';
 import '../../core/data/common_foods.dart';
 import '../../core/data/food.dart';
 import '../../core/data/food_catalog.dart';
@@ -24,6 +25,7 @@ import '../../core/widgets/macro_icons.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/widgets/segmented_pills.dart';
 import '../../core/widgets/sheet_scaffold.dart';
+import '../scan/barcode_scanner_page.dart';
 import '../meals/meal_detail_sheet.dart';
 import '../../core/widgets/app_icon.dart';
 
@@ -118,7 +120,12 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
   _Chip? _chip;
   bool _mealPickerOpen = false;
   Food? _detail;
+  bool _detailByWeight = false;
   String _customName = '';
+
+  /// Set while entering a product the barcode lookup didn't know, so it is
+  /// remembered for the next scan.
+  String? _newBarcode;
 
   /// What was added during this visit, per food name, plus totals.
   final Map<String, List<_Added>> _added = {};
@@ -285,6 +292,23 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
       await _insert(d.name, AppEmoji.custom, t);
     }
 
+    final code = _newBarcode;
+    if (code != null && existing == null) {
+      await BarcodeLookup(db).remember(
+        code,
+        Food(
+          name: d.name,
+          emoji: AppEmoji.packaged,
+          group: FoodGroup.other,
+          serving: '1 serving',
+          kcal: d.kcal,
+          protein: d.protein,
+          carbs: d.carbs,
+          fat: d.fat,
+        ),
+      );
+    }
+
     if (d.saveToMine && existing == null) {
       await db.addCustomFood(CustomFoodsCompanion.insert(
         name: d.name,
@@ -331,26 +355,51 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
 
   // --------------------------------------------------------- navigation
 
-  void _goBrowse() => setState(() => _page = _Page.browse);
+  void _goBrowse() => setState(() {
+        _page = _Page.browse;
+        _newBarcode = null;
+      });
 
-  void _openDetail(Food f) {
+  /// [byWeight] opens it on grams (packaged foods are weighed, not counted).
+  void _openDetail(Food f, {bool byWeight = false}) {
     Haptics.tap();
     FocusScope.of(context).unfocus();
     setState(() {
       _detail = f;
+      _detailByWeight = byWeight;
       _page = _Page.detail;
     });
     _scrollToTop();
   }
 
-  void _openCustom({String name = ''}) {
+  void _openCustom({String name = '', String? barcode}) {
     Haptics.tap();
     FocusScope.of(context).unfocus();
     setState(() {
       _customName = name;
+      _newBarcode = barcode;
       _page = _Page.custom;
     });
     _scrollToTop();
+  }
+
+  /// Scans a barcode: a known product opens ready to weigh; an unknown one
+  /// opens the custom form, and what's typed there is kept for next time.
+  Future<void> _scan() async {
+    FocusScope.of(context).unfocus();
+    final result = await showBarcodeScanner(
+      context,
+      lookup: BarcodeLookup(ref.read(databaseProvider)).lookup,
+    );
+    if (!mounted || result == null) return;
+    switch (result) {
+      case BarcodeFound(:final food):
+        _openDetail(food, byWeight: true);
+      case BarcodeNotFound(:final barcode, :final name):
+        _openCustom(name: name ?? '', barcode: barcode);
+      case BarcodeFailed(:final barcode):
+        _openCustom(barcode: barcode);
+    }
   }
 
   Future<void> _deleteCustom(CustomFood f) async {
@@ -508,7 +557,8 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
           controller: SheetScope.maybeOf(context),
           physics: sheetScrollPhysics,
           slivers: [
-            SliverToBoxAdapter(
+            // Title, back and meal chip stay put; the search bar pins under them.
+            PinnedSheetHeader(
               child: _Header(
                 title: _page == _Page.browse ? title : _pageTitle(title),
                 meal: _picking ? null : _meal,
@@ -534,6 +584,7 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
                     scrollController: _chipsScroll,
                     selected: _query.isEmpty ? _chip : null,
                     onChip: (c) => _selectChip(chips, c),
+                    onScan: _scan,
                   ),
                 ),
               ),
@@ -550,6 +601,7 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
                   key: ValueKey('detail-${_detail!.name}'),
                   child: _FoodDetail(
                     food: _detail!,
+                    startByWeight: _detailByWeight,
                     mealLabel: _picking ? null : _meal.label.toLowerCase(),
                     onAdd: (food, qty, note) async {
                       await _add(food, qty, note: note);
@@ -566,6 +618,9 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
                 child: _SlideIn(
                   key: const ValueKey('custom'),
                   child: _CustomForm(
+                    note: _newBarcode == null
+                        ? null
+                        : 'This barcode isn’t in the food database yet. Enter it from the label once and the next scan finds it.',
                     initialName: _customName,
                     editing: widget.editing,
                     submitLabel: _editing
@@ -603,7 +658,7 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
 
   String _pageTitle(String fallback) => switch (_page) {
         _Page.detail => 'Add food',
-        _Page.custom => _picking ? 'Custom ingredient' : 'Custom food',
+        _Page.custom => _newBarcode != null ? 'New product' : _picking ? 'Custom ingredient' : 'Custom food',
         _Page.browse => fallback,
       };
 
@@ -886,8 +941,10 @@ class _SearchAndChips extends StatelessWidget {
     required this.scrollController,
     required this.selected,
     required this.onChip,
+    required this.onScan,
   });
 
+  final VoidCallback onScan;
   final TextEditingController controller;
   final List<_Chip> chips;
   final Map<_Chip, GlobalKey> chipKeys;
@@ -940,6 +997,18 @@ class _SearchAndChips extends StatelessWidget {
                       controller.clear();
                     },
                     child: AppIcon(AppIcons.clearFill, size: 20, color: p.textTertiary),
+                  )
+                else
+                  PressScale(
+                    semanticLabel: 'Scan a barcode',
+                    scale: 0.88,
+                    onTap: onScan,
+                    // 40px hit area at the pill's right edge.
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: AppIcon(AppIcons.barcode, size: 22, color: p.textPrimary),
+                    ),
                   ),
               ],
             ),
@@ -1301,9 +1370,11 @@ class _FoodDetail extends StatefulWidget {
     required this.mealLabel,
     required this.onAdd,
     this.onDelete,
+    this.startByWeight = false,
   });
 
   final Food food;
+  final bool startByWeight;
   final String? mealLabel;
   /// Adds [qty] of the given food: the original for servings, or a copy
   /// portioned to the weighed grams (then [note] is e.g. "50 g").
@@ -1327,7 +1398,7 @@ class _FoodDetailState extends State<_FoodDetail> {
   static const List<int> _gramPresets = [50, 100, 150, 200];
 
   double _qty = 1;
-  _Unit _unit = _Unit.servings;
+  late _Unit _unit = widget.startByWeight && _canWeigh ? _Unit.grams : _Unit.servings;
   late int _g = widget.food.grams ?? 100;
   late final _gramsField = TextEditingController(text: '$_g');
 
@@ -1696,8 +1767,11 @@ class _CustomForm extends StatefulWidget {
     required this.allowSave,
     required this.onSubmit,
     this.onDelete,
+    this.note,
   });
 
+  /// Shown above the fields (e.g. why a scanned product needs typing in).
+  final String? note;
   final String initialName;
   final FoodEntry? editing;
   final String submitLabel;
@@ -1806,6 +1880,10 @@ class _CustomFormState extends State<_CustomForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.note != null) ...[
+            Text(widget.note!, style: t.label),
+            const SizedBox(height: AppSpacing.md),
+          ],
           TextField(
             controller: _name,
             textCapitalization: TextCapitalization.sentences,

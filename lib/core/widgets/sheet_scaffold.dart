@@ -102,6 +102,19 @@ class _SheetFrame extends StatelessWidget {
   }
 }
 
+/// A sheet's handle + title block, pinned to the top of its scroll view on
+/// the sheet's surface so content scrolls underneath it.
+class PinnedSheetHeader extends StatelessWidget {
+  const PinnedSheetHeader({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PinnedHeaderSliver(
+        child: ColoredBox(color: context.palette.surface, child: child),
+      );
+}
+
 class SheetHandle extends StatelessWidget {
   const SheetHandle({super.key});
 
@@ -120,7 +133,9 @@ class SheetHandle extends StatelessWidget {
   }
 }
 
-/// Standard sheet body: drag handle, title, content. Scrolls with the sheet.
+/// Standard sheet body: drag handle, title, content. The handle and title stay
+/// pinned; only the content scrolls under them (and drags the sheet down once
+/// it is back at the top).
 class SheetScaffold extends StatelessWidget {
   const SheetScaffold({
     super.key,
@@ -140,35 +155,48 @@ class SheetScaffold extends StatelessWidget {
     final t = context.type;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return SingleChildScrollView(
+    return CustomScrollView(
       controller: SheetScope.maybeOf(context),
       physics: sheetScrollPhysics,
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.screen,
-        AppSpacing.md,
-        AppSpacing.screen,
-        AppSpacing.xxl + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SheetHandle(),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(child: Text(title, style: t.title)),
-              ?trailing,
-            ],
+      slivers: [
+        PinnedSheetHeader(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screen,
+              AppSpacing.md,
+              AppSpacing.screen,
+              AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SheetHandle(),
+                const SizedBox(height: AppSpacing.lg),
+                Row(
+                  children: [
+                    Expanded(child: Text(title, style: t.title)),
+                    ?trailing,
+                  ],
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(subtitle!, style: t.label),
+                ],
+              ],
+            ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: AppSpacing.xxs),
-            Text(subtitle!, style: t.label),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          child,
-        ],
-      ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.screen,
+            0,
+            AppSpacing.screen,
+            AppSpacing.xxl + bottomInset,
+          ),
+          sliver: SliverToBoxAdapter(child: child),
+        ),
+      ],
     );
   }
 }

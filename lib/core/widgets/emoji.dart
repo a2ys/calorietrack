@@ -17,6 +17,9 @@ abstract final class AppEmoji {
   static const recent = '🕘';
   static const saved = '⭐';
   static const custom = '✏️';
+
+  /// Packaged food found by barcode.
+  static const packaged = '🥫';
   static const welcome = '🥑';
 
   /// Avatars and meal covers the user can pick from.

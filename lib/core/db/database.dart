@@ -56,6 +56,25 @@ class WaterLogs extends Table {
   DateTimeColumn get loggedAt => dateTime()();
 }
 
+/// Foods found by barcode, from Open Food Facts or typed in by the user for a
+/// code it didn't know, so scanning the same product again is instant and
+/// works offline. Nutrition is for one [serving]; [grams] is its weight when
+/// known (then any weight can be logged).
+class ScannedFoods extends Table {
+  TextColumn get barcode => text()();
+  TextColumn get name => text().withLength(min: 1, max: 120)();
+  TextColumn get serving => text()();
+  IntColumn get grams => integer().nullable()();
+  IntColumn get kcal => integer()();
+  RealColumn get protein => real().withDefault(const Constant(0))();
+  RealColumn get carbs => real().withDefault(const Constant(0))();
+  RealColumn get fat => real().withDefault(const Constant(0))();
+  DateTimeColumn get savedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {barcode};
+}
+
 /// A single row (id = 1) holding the onboarding answers and daily targets.
 class UserProfiles extends Table {
   IntColumn get id => integer()();
@@ -83,7 +102,7 @@ class Prefs extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [FoodEntries, CustomFoods, SavedMeals, WaterLogs, UserProfiles, Prefs])
+@DriftDatabase(tables: [FoodEntries, CustomFoods, SavedMeals, WaterLogs, ScannedFoods, UserProfiles, Prefs])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -99,7 +118,7 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -107,6 +126,7 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(savedMeals);
           if (from < 3) await m.createTable(waterLogs);
+          if (from < 4) await m.createTable(scannedFoods);
         },
       );
 
@@ -252,6 +272,14 @@ class AppDatabase extends _$AppDatabase {
       into(userProfiles).insertOnConflictUpdate(
         profile.copyWith(id: const Value(profileId)),
       );
+
+  // ------------------------------------------------------------ barcodes
+
+  Future<ScannedFood?> getScannedFood(String barcode) =>
+      (select(scannedFoods)..where((f) => f.barcode.equals(barcode))).getSingleOrNull();
+
+  Future<void> saveScannedFood(ScannedFoodsCompanion food) =>
+      into(scannedFoods).insertOnConflictUpdate(food);
 
   // ------------------------------------------------------------- prefs
 

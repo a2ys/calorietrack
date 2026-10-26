@@ -1,0 +1,13 @@
+# Photo -> meal proxy. Holds the Anthropic API key so the app never ships one.
+# Secrets (never commit them): `npx wrangler secret put ANTHROPIC_API_KEY`
+# and `npx wrangler secret put APP_TOKEN`.
+name = "calorie-photo-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 20 photos a minute per app install; the app sends a random install id.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }

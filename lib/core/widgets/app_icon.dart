@@ -27,6 +27,9 @@ abstract final class AppIcons {
   static const check = AppIconData('bold-check');
   static const bookmark = AppIconData('bold-bookmark-simple');
   static const clearFill = AppIconData('fill-x-circle');
+  static const barcode = AppIconData('bold-barcode');
+  static const lightning = AppIconData('bold-lightning');
+  static const lightningFill = AppIconData('fill-lightning');
 
   // Tabs: solid in both states; colour marks the active one.
   static const houseFill = AppIconData('fill-house');

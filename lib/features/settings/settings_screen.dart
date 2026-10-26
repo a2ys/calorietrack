@@ -288,7 +288,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Everything is stored on this device only. No account, no cloud.',
+            'Everything is stored on this device. No account, no cloud. Scanning a barcode sends only its number to Open Food Facts.',
             style: t.caption,
             textAlign: TextAlign.center,
           ),

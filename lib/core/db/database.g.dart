@@ -1677,6 +1677,560 @@ class WaterLogsCompanion extends UpdateCompanion<WaterLog> {
   }
 }
 
+class $ScannedFoodsTable extends ScannedFoods
+    with TableInfo<$ScannedFoodsTable, ScannedFood> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ScannedFoodsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 120,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _servingMeta = const VerificationMeta(
+    'serving',
+  );
+  @override
+  late final GeneratedColumn<String> serving = GeneratedColumn<String>(
+    'serving',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gramsMeta = const VerificationMeta('grams');
+  @override
+  late final GeneratedColumn<int> grams = GeneratedColumn<int>(
+    'grams',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _kcalMeta = const VerificationMeta('kcal');
+  @override
+  late final GeneratedColumn<int> kcal = GeneratedColumn<int>(
+    'kcal',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _proteinMeta = const VerificationMeta(
+    'protein',
+  );
+  @override
+  late final GeneratedColumn<double> protein = GeneratedColumn<double>(
+    'protein',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _carbsMeta = const VerificationMeta('carbs');
+  @override
+  late final GeneratedColumn<double> carbs = GeneratedColumn<double>(
+    'carbs',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _fatMeta = const VerificationMeta('fat');
+  @override
+  late final GeneratedColumn<double> fat = GeneratedColumn<double>(
+    'fat',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _savedAtMeta = const VerificationMeta(
+    'savedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> savedAt = GeneratedColumn<DateTime>(
+    'saved_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    barcode,
+    name,
+    serving,
+    grams,
+    kcal,
+    protein,
+    carbs,
+    fat,
+    savedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'scanned_foods';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ScannedFood> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_barcodeMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('serving')) {
+      context.handle(
+        _servingMeta,
+        serving.isAcceptableOrUnknown(data['serving']!, _servingMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_servingMeta);
+    }
+    if (data.containsKey('grams')) {
+      context.handle(
+        _gramsMeta,
+        grams.isAcceptableOrUnknown(data['grams']!, _gramsMeta),
+      );
+    }
+    if (data.containsKey('kcal')) {
+      context.handle(
+        _kcalMeta,
+        kcal.isAcceptableOrUnknown(data['kcal']!, _kcalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kcalMeta);
+    }
+    if (data.containsKey('protein')) {
+      context.handle(
+        _proteinMeta,
+        protein.isAcceptableOrUnknown(data['protein']!, _proteinMeta),
+      );
+    }
+    if (data.containsKey('carbs')) {
+      context.handle(
+        _carbsMeta,
+        carbs.isAcceptableOrUnknown(data['carbs']!, _carbsMeta),
+      );
+    }
+    if (data.containsKey('fat')) {
+      context.handle(
+        _fatMeta,
+        fat.isAcceptableOrUnknown(data['fat']!, _fatMeta),
+      );
+    }
+    if (data.containsKey('saved_at')) {
+      context.handle(
+        _savedAtMeta,
+        savedAt.isAcceptableOrUnknown(data['saved_at']!, _savedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_savedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {barcode};
+  @override
+  ScannedFood map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ScannedFood(
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      serving: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}serving'],
+      )!,
+      grams: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}grams'],
+      ),
+      kcal: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}kcal'],
+      )!,
+      protein: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}protein'],
+      )!,
+      carbs: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}carbs'],
+      )!,
+      fat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}fat'],
+      )!,
+      savedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}saved_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ScannedFoodsTable createAlias(String alias) {
+    return $ScannedFoodsTable(attachedDatabase, alias);
+  }
+}
+
+class ScannedFood extends DataClass implements Insertable<ScannedFood> {
+  final String barcode;
+  final String name;
+  final String serving;
+  final int? grams;
+  final int kcal;
+  final double protein;
+  final double carbs;
+  final double fat;
+  final DateTime savedAt;
+  const ScannedFood({
+    required this.barcode,
+    required this.name,
+    required this.serving,
+    this.grams,
+    required this.kcal,
+    required this.protein,
+    required this.carbs,
+    required this.fat,
+    required this.savedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['barcode'] = Variable<String>(barcode);
+    map['name'] = Variable<String>(name);
+    map['serving'] = Variable<String>(serving);
+    if (!nullToAbsent || grams != null) {
+      map['grams'] = Variable<int>(grams);
+    }
+    map['kcal'] = Variable<int>(kcal);
+    map['protein'] = Variable<double>(protein);
+    map['carbs'] = Variable<double>(carbs);
+    map['fat'] = Variable<double>(fat);
+    map['saved_at'] = Variable<DateTime>(savedAt);
+    return map;
+  }
+
+  ScannedFoodsCompanion toCompanion(bool nullToAbsent) {
+    return ScannedFoodsCompanion(
+      barcode: Value(barcode),
+      name: Value(name),
+      serving: Value(serving),
+      grams: grams == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grams),
+      kcal: Value(kcal),
+      protein: Value(protein),
+      carbs: Value(carbs),
+      fat: Value(fat),
+      savedAt: Value(savedAt),
+    );
+  }
+
+  factory ScannedFood.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ScannedFood(
+      barcode: serializer.fromJson<String>(json['barcode']),
+      name: serializer.fromJson<String>(json['name']),
+      serving: serializer.fromJson<String>(json['serving']),
+      grams: serializer.fromJson<int?>(json['grams']),
+      kcal: serializer.fromJson<int>(json['kcal']),
+      protein: serializer.fromJson<double>(json['protein']),
+      carbs: serializer.fromJson<double>(json['carbs']),
+      fat: serializer.fromJson<double>(json['fat']),
+      savedAt: serializer.fromJson<DateTime>(json['savedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'barcode': serializer.toJson<String>(barcode),
+      'name': serializer.toJson<String>(name),
+      'serving': serializer.toJson<String>(serving),
+      'grams': serializer.toJson<int?>(grams),
+      'kcal': serializer.toJson<int>(kcal),
+      'protein': serializer.toJson<double>(protein),
+      'carbs': serializer.toJson<double>(carbs),
+      'fat': serializer.toJson<double>(fat),
+      'savedAt': serializer.toJson<DateTime>(savedAt),
+    };
+  }
+
+  ScannedFood copyWith({
+    String? barcode,
+    String? name,
+    String? serving,
+    Value<int?> grams = const Value.absent(),
+    int? kcal,
+    double? protein,
+    double? carbs,
+    double? fat,
+    DateTime? savedAt,
+  }) => ScannedFood(
+    barcode: barcode ?? this.barcode,
+    name: name ?? this.name,
+    serving: serving ?? this.serving,
+    grams: grams.present ? grams.value : this.grams,
+    kcal: kcal ?? this.kcal,
+    protein: protein ?? this.protein,
+    carbs: carbs ?? this.carbs,
+    fat: fat ?? this.fat,
+    savedAt: savedAt ?? this.savedAt,
+  );
+  ScannedFood copyWithCompanion(ScannedFoodsCompanion data) {
+    return ScannedFood(
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      name: data.name.present ? data.name.value : this.name,
+      serving: data.serving.present ? data.serving.value : this.serving,
+      grams: data.grams.present ? data.grams.value : this.grams,
+      kcal: data.kcal.present ? data.kcal.value : this.kcal,
+      protein: data.protein.present ? data.protein.value : this.protein,
+      carbs: data.carbs.present ? data.carbs.value : this.carbs,
+      fat: data.fat.present ? data.fat.value : this.fat,
+      savedAt: data.savedAt.present ? data.savedAt.value : this.savedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ScannedFood(')
+          ..write('barcode: $barcode, ')
+          ..write('name: $name, ')
+          ..write('serving: $serving, ')
+          ..write('grams: $grams, ')
+          ..write('kcal: $kcal, ')
+          ..write('protein: $protein, ')
+          ..write('carbs: $carbs, ')
+          ..write('fat: $fat, ')
+          ..write('savedAt: $savedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    barcode,
+    name,
+    serving,
+    grams,
+    kcal,
+    protein,
+    carbs,
+    fat,
+    savedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ScannedFood &&
+          other.barcode == this.barcode &&
+          other.name == this.name &&
+          other.serving == this.serving &&
+          other.grams == this.grams &&
+          other.kcal == this.kcal &&
+          other.protein == this.protein &&
+          other.carbs == this.carbs &&
+          other.fat == this.fat &&
+          other.savedAt == this.savedAt);
+}
+
+class ScannedFoodsCompanion extends UpdateCompanion<ScannedFood> {
+  final Value<String> barcode;
+  final Value<String> name;
+  final Value<String> serving;
+  final Value<int?> grams;
+  final Value<int> kcal;
+  final Value<double> protein;
+  final Value<double> carbs;
+  final Value<double> fat;
+  final Value<DateTime> savedAt;
+  final Value<int> rowid;
+  const ScannedFoodsCompanion({
+    this.barcode = const Value.absent(),
+    this.name = const Value.absent(),
+    this.serving = const Value.absent(),
+    this.grams = const Value.absent(),
+    this.kcal = const Value.absent(),
+    this.protein = const Value.absent(),
+    this.carbs = const Value.absent(),
+    this.fat = const Value.absent(),
+    this.savedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ScannedFoodsCompanion.insert({
+    required String barcode,
+    required String name,
+    required String serving,
+    this.grams = const Value.absent(),
+    required int kcal,
+    this.protein = const Value.absent(),
+    this.carbs = const Value.absent(),
+    this.fat = const Value.absent(),
+    required DateTime savedAt,
+    this.rowid = const Value.absent(),
+  }) : barcode = Value(barcode),
+       name = Value(name),
+       serving = Value(serving),
+       kcal = Value(kcal),
+       savedAt = Value(savedAt);
+  static Insertable<ScannedFood> custom({
+    Expression<String>? barcode,
+    Expression<String>? name,
+    Expression<String>? serving,
+    Expression<int>? grams,
+    Expression<int>? kcal,
+    Expression<double>? protein,
+    Expression<double>? carbs,
+    Expression<double>? fat,
+    Expression<DateTime>? savedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (barcode != null) 'barcode': barcode,
+      if (name != null) 'name': name,
+      if (serving != null) 'serving': serving,
+      if (grams != null) 'grams': grams,
+      if (kcal != null) 'kcal': kcal,
+      if (protein != null) 'protein': protein,
+      if (carbs != null) 'carbs': carbs,
+      if (fat != null) 'fat': fat,
+      if (savedAt != null) 'saved_at': savedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ScannedFoodsCompanion copyWith({
+    Value<String>? barcode,
+    Value<String>? name,
+    Value<String>? serving,
+    Value<int?>? grams,
+    Value<int>? kcal,
+    Value<double>? protein,
+    Value<double>? carbs,
+    Value<double>? fat,
+    Value<DateTime>? savedAt,
+    Value<int>? rowid,
+  }) {
+    return ScannedFoodsCompanion(
+      barcode: barcode ?? this.barcode,
+      name: name ?? this.name,
+      serving: serving ?? this.serving,
+      grams: grams ?? this.grams,
+      kcal: kcal ?? this.kcal,
+      protein: protein ?? this.protein,
+      carbs: carbs ?? this.carbs,
+      fat: fat ?? this.fat,
+      savedAt: savedAt ?? this.savedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (serving.present) {
+      map['serving'] = Variable<String>(serving.value);
+    }
+    if (grams.present) {
+      map['grams'] = Variable<int>(grams.value);
+    }
+    if (kcal.present) {
+      map['kcal'] = Variable<int>(kcal.value);
+    }
+    if (protein.present) {
+      map['protein'] = Variable<double>(protein.value);
+    }
+    if (carbs.present) {
+      map['carbs'] = Variable<double>(carbs.value);
+    }
+    if (fat.present) {
+      map['fat'] = Variable<double>(fat.value);
+    }
+    if (savedAt.present) {
+      map['saved_at'] = Variable<DateTime>(savedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ScannedFoodsCompanion(')
+          ..write('barcode: $barcode, ')
+          ..write('name: $name, ')
+          ..write('serving: $serving, ')
+          ..write('grams: $grams, ')
+          ..write('kcal: $kcal, ')
+          ..write('protein: $protein, ')
+          ..write('carbs: $carbs, ')
+          ..write('fat: $fat, ')
+          ..write('savedAt: $savedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $UserProfilesTable extends UserProfiles
     with TableInfo<$UserProfilesTable, UserProfile> {
   @override
@@ -2557,6 +3111,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CustomFoodsTable customFoods = $CustomFoodsTable(this);
   late final $SavedMealsTable savedMeals = $SavedMealsTable(this);
   late final $WaterLogsTable waterLogs = $WaterLogsTable(this);
+  late final $ScannedFoodsTable scannedFoods = $ScannedFoodsTable(this);
   late final $UserProfilesTable userProfiles = $UserProfilesTable(this);
   late final $PrefsTable prefs = $PrefsTable(this);
   @override
@@ -2568,6 +3123,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     customFoods,
     savedMeals,
     waterLogs,
+    scannedFoods,
     userProfiles,
     prefs,
   ];
@@ -3484,6 +4040,291 @@ typedef $$WaterLogsTableProcessedTableManager =
       WaterLog,
       PrefetchHooks Function()
     >;
+typedef $$ScannedFoodsTableCreateCompanionBuilder =
+    ScannedFoodsCompanion Function({
+      required String barcode,
+      required String name,
+      required String serving,
+      Value<int?> grams,
+      required int kcal,
+      Value<double> protein,
+      Value<double> carbs,
+      Value<double> fat,
+      required DateTime savedAt,
+      Value<int> rowid,
+    });
+typedef $$ScannedFoodsTableUpdateCompanionBuilder =
+    ScannedFoodsCompanion Function({
+      Value<String> barcode,
+      Value<String> name,
+      Value<String> serving,
+      Value<int?> grams,
+      Value<int> kcal,
+      Value<double> protein,
+      Value<double> carbs,
+      Value<double> fat,
+      Value<DateTime> savedAt,
+      Value<int> rowid,
+    });
+
+class $$ScannedFoodsTableFilterComposer
+    extends Composer<_$AppDatabase, $ScannedFoodsTable> {
+  $$ScannedFoodsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serving => $composableBuilder(
+    column: $table.serving,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get grams => $composableBuilder(
+    column: $table.grams,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get kcal => $composableBuilder(
+    column: $table.kcal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get protein => $composableBuilder(
+    column: $table.protein,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get carbs => $composableBuilder(
+    column: $table.carbs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get fat => $composableBuilder(
+    column: $table.fat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get savedAt => $composableBuilder(
+    column: $table.savedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ScannedFoodsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ScannedFoodsTable> {
+  $$ScannedFoodsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serving => $composableBuilder(
+    column: $table.serving,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get grams => $composableBuilder(
+    column: $table.grams,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get kcal => $composableBuilder(
+    column: $table.kcal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get protein => $composableBuilder(
+    column: $table.protein,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get carbs => $composableBuilder(
+    column: $table.carbs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get fat => $composableBuilder(
+    column: $table.fat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get savedAt => $composableBuilder(
+    column: $table.savedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ScannedFoodsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ScannedFoodsTable> {
+  $$ScannedFoodsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get serving =>
+      $composableBuilder(column: $table.serving, builder: (column) => column);
+
+  GeneratedColumn<int> get grams =>
+      $composableBuilder(column: $table.grams, builder: (column) => column);
+
+  GeneratedColumn<int> get kcal =>
+      $composableBuilder(column: $table.kcal, builder: (column) => column);
+
+  GeneratedColumn<double> get protein =>
+      $composableBuilder(column: $table.protein, builder: (column) => column);
+
+  GeneratedColumn<double> get carbs =>
+      $composableBuilder(column: $table.carbs, builder: (column) => column);
+
+  GeneratedColumn<double> get fat =>
+      $composableBuilder(column: $table.fat, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get savedAt =>
+      $composableBuilder(column: $table.savedAt, builder: (column) => column);
+}
+
+class $$ScannedFoodsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ScannedFoodsTable,
+          ScannedFood,
+          $$ScannedFoodsTableFilterComposer,
+          $$ScannedFoodsTableOrderingComposer,
+          $$ScannedFoodsTableAnnotationComposer,
+          $$ScannedFoodsTableCreateCompanionBuilder,
+          $$ScannedFoodsTableUpdateCompanionBuilder,
+          (
+            ScannedFood,
+            BaseReferences<_$AppDatabase, $ScannedFoodsTable, ScannedFood>,
+          ),
+          ScannedFood,
+          PrefetchHooks Function()
+        > {
+  $$ScannedFoodsTableTableManager(_$AppDatabase db, $ScannedFoodsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ScannedFoodsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ScannedFoodsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ScannedFoodsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> barcode = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> serving = const Value.absent(),
+                Value<int?> grams = const Value.absent(),
+                Value<int> kcal = const Value.absent(),
+                Value<double> protein = const Value.absent(),
+                Value<double> carbs = const Value.absent(),
+                Value<double> fat = const Value.absent(),
+                Value<DateTime> savedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ScannedFoodsCompanion(
+                barcode: barcode,
+                name: name,
+                serving: serving,
+                grams: grams,
+                kcal: kcal,
+                protein: protein,
+                carbs: carbs,
+                fat: fat,
+                savedAt: savedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String barcode,
+                required String name,
+                required String serving,
+                Value<int?> grams = const Value.absent(),
+                required int kcal,
+                Value<double> protein = const Value.absent(),
+                Value<double> carbs = const Value.absent(),
+                Value<double> fat = const Value.absent(),
+                required DateTime savedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ScannedFoodsCompanion.insert(
+                barcode: barcode,
+                name: name,
+                serving: serving,
+                grams: grams,
+                kcal: kcal,
+                protein: protein,
+                carbs: carbs,
+                fat: fat,
+                savedAt: savedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ScannedFoodsTable, ScannedFood>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ScannedFoodsTable,
+                    ScannedFood
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ScannedFoodsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ScannedFoodsTable,
+      ScannedFood,
+      $$ScannedFoodsTableFilterComposer,
+      $$ScannedFoodsTableOrderingComposer,
+      $$ScannedFoodsTableAnnotationComposer,
+      $$ScannedFoodsTableCreateCompanionBuilder,
+      $$ScannedFoodsTableUpdateCompanionBuilder,
+      (
+        ScannedFood,
+        BaseReferences<_$AppDatabase, $ScannedFoodsTable, ScannedFood>,
+      ),
+      ScannedFood,
+      PrefetchHooks Function()
+    >;
 typedef $$UserProfilesTableCreateCompanionBuilder =
     UserProfilesCompanion Function({
       Value<int> id,
@@ -3955,6 +4796,8 @@ class $AppDatabaseManager {
       $$SavedMealsTableTableManager(_db, _db.savedMeals);
   $$WaterLogsTableTableManager get waterLogs =>
       $$WaterLogsTableTableManager(_db, _db.waterLogs);
+  $$ScannedFoodsTableTableManager get scannedFoods =>
+      $$ScannedFoodsTableTableManager(_db, _db.scannedFoods);
   $$UserProfilesTableTableManager get userProfiles =>
       $$UserProfilesTableTableManager(_db, _db.userProfiles);
   $$PrefsTableTableManager get prefs =>

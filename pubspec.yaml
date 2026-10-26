@@ -40,6 +40,8 @@ dependencies:
   drift_flutter: ^0.3.1
   intl: ^0.20.3
   flutter_svg: ^2.3.0
+  mobile_scanner: 7.4.2
+  http: 1.6.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

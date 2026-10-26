@@ -20,6 +20,7 @@ const List<(String, String, String, String)> kCredits = [
   ('Plus Jakarta Sans', 'Typeface', 'SIL Open Font License 1.1', 'Tokotype'),
   ('Interface Sounds', 'Sound effects', 'CC0 1.0 (public domain)', 'Kenney (kenney.nl)'),
   ('FoodData Central', 'Nutrition data', 'Public domain (CC0)', 'U.S. Department of Agriculture'),
+  ('Open Food Facts', 'Barcode product data', 'Open Database License (ODbL)', 'Open Food Facts contributors'),
 ];
 
 class _LicensesSheet extends StatelessWidget {
