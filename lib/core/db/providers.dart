@@ -46,6 +46,13 @@ final waterForDayProvider = StreamProvider.family<List<WaterLog>, DateTime>(
   (ref, day) => ref.watch(databaseProvider).watchWaterForDay(day),
 );
 
+final dailyWaterProvider =
+    StreamProvider.family<Map<DateTime, int>, DateTime>((ref, weekStart) {
+  return ref
+      .watch(databaseProvider)
+      .watchDailyWater(weekStart, addDays(weekStart, 7));
+});
+
 final savedMealsProvider = StreamProvider<List<SavedMeal>>(
   (ref) => ref.watch(databaseProvider).watchSavedMeals(),
 );

@@ -1322,6 +1322,7 @@ class _Footer extends StatelessWidget {
               label: anyAdded ? 'Custom' : 'Custom food',
               icon: AppIcons.pencil,
               style: AppButtonStyle.outline,
+              fill: p.surface,
               onPressed: onCustom,
             ),
           ),

@@ -7,6 +7,7 @@ import '../../core/db/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/water.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/count_up_text.dart';
@@ -15,6 +16,7 @@ import '../../core/widgets/entry_tile.dart';
 import '../../core/widgets/macro_icons.dart';
 import '../../core/widgets/press_scale.dart';
 import '../add_food/add_food_sheet.dart';
+import '../water/water_card.dart';
 import 'week_bar_chart.dart';
 import '../../core/widgets/app_icon.dart';
 
@@ -32,6 +34,8 @@ class HistoryScreen extends ConsumerWidget {
     final profile = ref.watch(profileProvider).value;
     final totals = ref.watch(dailyTotalsProvider(weekStart)).value ?? const {};
     final entries = ref.watch(entriesForDayProvider(selected)).value ?? const <FoodEntry>[];
+    final prefs = readPrefs(ref);
+    final water = ref.watch(dailyWaterProvider(weekStart)).value ?? const {};
 
     if (profile == null) return const SizedBox.shrink();
 
@@ -89,15 +93,27 @@ class HistoryScreen extends ConsumerWidget {
               ),
               child: WeekBarChart(
                 weekStart: weekStart,
-                totals: totals,
+                values: {for (final e in totals.entries) e.key: e.value.kcal},
                 target: profile.calorieTarget,
                 selected: selected,
                 onSelect: (d) => ref.read(selectedDayProvider.notifier).select(d),
+                goalLabel: 'Goal ${profile.calorieTarget} kcal',
+                formatValue: (v) => '$v',
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           _WeekStats(totals: totals, target: profile.calorieTarget),
+          if (prefs.showWater) ...[
+            const SizedBox(height: AppSpacing.md),
+            _WaterWeek(
+              weekStart: weekStart,
+              water: water,
+              goal: prefs.waterGoalMl,
+              selected: selected,
+              onSelect: (d) => ref.read(selectedDayProvider.notifier).select(d),
+            ),
+          ],
           const SizedBox(height: AppSpacing.xxl),
           _DayHeader(
             day: selected,
@@ -105,6 +121,10 @@ class HistoryScreen extends ConsumerWidget {
             target: profile.calorieTarget,
           ),
           const SizedBox(height: AppSpacing.md),
+          if (prefs.showWater) ...[
+            WaterCard(day: selected),
+            const SizedBox(height: AppSpacing.md),
+          ],
           if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
@@ -168,6 +188,66 @@ class _WeekStats extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Week of water: seven slim bars against the daily goal, plus the average
+/// over the days that have a drink logged.
+class _WaterWeek extends StatelessWidget {
+  const _WaterWeek({
+    required this.weekStart,
+    required this.water,
+    required this.goal,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final DateTime weekStart;
+  final Map<DateTime, int> water;
+  final int goal;
+  final DateTime selected;
+  final ValueChanged<DateTime> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.type;
+    final p = context.palette;
+    final logged = water.values.where((v) => v > 0).toList();
+    final avg = logged.isEmpty ? 0 : (logged.fold<int>(0, (s, v) => s + v) / logged.length).round();
+    final hit = logged.where((v) => v >= goal).length;
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Emoji(AppEmoji.water, size: 18),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text('Water', style: t.bodyStrong)),
+              Text(
+                logged.isEmpty ? 'No water logged' : '${formatWater(avg)} avg · $hit/${logged.length} on goal',
+                style: t.label.copyWith(color: p.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          WeekBarChart(
+            weekStart: weekStart,
+            values: water,
+            target: goal,
+            selected: selected,
+            onSelect: onSelect,
+            goalLabel: 'Goal ${formatWater(goal)}',
+            formatValue: formatWater,
+            color: p.water,
+            overIsBad: false,
+            height: 170,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -15,12 +15,16 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.style = AppButtonStyle.primary,
     this.icon,
+    this.fill,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final AppButtonStyle style;
   final AppIconData? icon;
+
+  /// Fill for outline/danger buttons that float over scrolling content.
+  final Color? fill;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,7 @@ class AppButton extends StatelessWidget {
           height: AppSizes.button,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: primary ? p.ink : Colors.transparent,
+            color: primary ? p.ink : (fill ?? Colors.transparent),
             borderRadius: AppRadii.chip,
             border: primary ? null : Border.all(color: danger ? p.accent : p.ink, width: 1.5),
           ),

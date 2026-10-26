@@ -1,28 +1,46 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-import '../../core/db/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/press_scale.dart';
 
-/// Seven calorie bars for one week with a dashed goal line.
+/// Seven bars for one week with a dashed goal line (calories by default,
+/// water via [color] / [goalLabel] / [formatValue]).
 /// Tap a bar to select that day; future days are inert.
 class WeekBarChart extends StatelessWidget {
   const WeekBarChart({
     super.key,
     required this.weekStart,
-    required this.totals,
+    required this.values,
     required this.target,
     required this.selected,
     required this.onSelect,
+    required this.goalLabel,
+    required this.formatValue,
+    this.color,
+    this.overIsBad = true,
+    this.height = AppSizes.barChartHeight,
   });
 
   final DateTime weekStart;
-  final Map<DateTime, Totals> totals;
+
+  /// Value per day (kcal or ml); days without data are absent.
+  final Map<DateTime, int> values;
   final int target;
   final DateTime selected;
   final ValueChanged<DateTime> onSelect;
+  final String goalLabel;
+  final String Function(int value) formatValue;
+
+  /// Fill of the selected bar; defaults to the ink colour.
+  final Color? color;
+
+  /// Calories turn red above the goal; for water, going over is fine.
+  final bool overIsBad;
+  final double height;
 
   static const double _labelAreaHeight = 44;
   static const double _valueLabelGap = 6;
@@ -37,11 +55,11 @@ class WeekBarChart extends StatelessWidget {
     final today = dateOnly(DateTime.now());
 
     final days = [for (var i = 0; i < 7; i++) addDays(weekStart, i)];
-    final peak = days.fold<int>(0, (m, d) => (totals[d]?.kcal ?? 0) > m ? totals[d]!.kcal : m);
+    final peak = days.fold<int>(0, (m, d) => (values[d] ?? 0) > m ? values[d]! : m);
     final maxY = (target > peak ? target : peak) * _headroom;
 
     return SizedBox(
-      height: AppSizes.barChartHeight,
+      height: height,
       child: LayoutBuilder(builder: (context, constraints) {
         final barsHeight = constraints.maxHeight - _labelAreaHeight;
         final goalY = barsHeight * (1 - target / maxY);
@@ -64,11 +82,13 @@ class WeekBarChart extends StatelessWidget {
                     child: _Bar(
                       day: days[i],
                       index: i,
-                      kcal: totals[days[i]]?.kcal ?? 0,
+                      value: values[days[i]] ?? 0,
+                      label: formatValue(values[days[i]] ?? 0),
+                      color: color,
                       barsHeight: barsHeight,
-                      fraction: (totals[days[i]]?.kcal ?? 0) / maxY,
+                      fraction: (values[days[i]] ?? 0) / maxY,
                       selected: isSameDay(days[i], selected),
-                      over: (totals[days[i]]?.kcal ?? 0) > target,
+                      over: overIsBad && (values[days[i]] ?? 0) > target,
                       future: days[i].isAfter(today),
                       onTap: () {
                         Haptics.tap();
@@ -81,9 +101,9 @@ class WeekBarChart extends StatelessWidget {
             // Painted after the bars so a tall bar never hides it.
             Positioned(
               left: 0,
-              top: goalY - _goalLabelHeight,
+              top: math.max(0, goalY - _goalLabelHeight),
               child: IgnorePointer(
-                child: Text('Goal $target kcal', style: t.caption.copyWith(color: p.textSecondary)),
+                child: Text(goalLabel, style: t.caption.copyWith(color: p.textSecondary)),
               ),
             ),
           ],
@@ -97,7 +117,9 @@ class _Bar extends StatelessWidget {
   const _Bar({
     required this.day,
     required this.index,
-    required this.kcal,
+    required this.value,
+    required this.label,
+    required this.color,
     required this.barsHeight,
     required this.fraction,
     required this.selected,
@@ -108,7 +130,9 @@ class _Bar extends StatelessWidget {
 
   final DateTime day;
   final int index;
-  final int kcal;
+  final int value;
+  final String label;
+  final Color? color;
   final double barsHeight;
   final double fraction;
   final bool selected;
@@ -123,9 +147,9 @@ class _Bar extends StatelessWidget {
     final reduce = MediaQuery.disableAnimationsOf(context);
 
     final barColor = selected
-        ? (over ? p.accent : p.ink)
-        : (over ? p.accent.withValues(alpha: 0.35) : p.track);
-    final target = kcal == 0 ? 0.0 : (barsHeight * fraction).clamp(WeekBarChart._minBar, barsHeight);
+        ? (over ? p.accent : (color ?? p.ink))
+        : (over ? p.accent.withValues(alpha: 0.35) : (color?.withValues(alpha: 0.3) ?? p.track));
+    final target = value == 0 ? 0.0 : (barsHeight * fraction).clamp(WeekBarChart._minBar, barsHeight);
 
     return PressScale(
       onTap: future ? null : onTap,
@@ -151,10 +175,10 @@ class _Bar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadii.xs),
                     ),
                   ),
-                  if (selected && kcal > 0)
+                  if (selected && value > 0)
                     Positioned(
                       bottom: h + WeekBarChart._valueLabelGap,
-                      child: Text('$kcal', style: t.caption.copyWith(color: p.textPrimary)),
+                      child: Text(label, style: t.caption.copyWith(color: p.textPrimary)),
                     ),
                 ],
               ),

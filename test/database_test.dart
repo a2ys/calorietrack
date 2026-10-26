@@ -191,6 +191,16 @@ void main() {
       expect(await db.watchWaterForDay(DateTime(2026, 10, 20)).first, hasLength(1));
     });
 
+    test('daily water sums per day inside the week window', () async {
+      await db.addWater(250, DateTime(2026, 10, 19, 8)); // Monday
+      await db.addWater(500, DateTime(2026, 10, 19, 20));
+      await db.addWater(750, DateTime(2026, 10, 25, 23, 59)); // Sunday
+      await db.addWater(300, DateTime(2026, 10, 26, 0, 0)); // next Monday: outside
+      final monday = DateTime(2026, 10, 19);
+      final totals = await db.watchDailyWater(monday, addDays(monday, 7)).first;
+      expect(totals, {DateTime(2026, 10, 19): 750, DateTime(2026, 10, 25): 750});
+    });
+
     test('erase everything clears water too', () async {
       await db.addWater(250, DateTime(2026, 10, 20, 9));
       await db.deleteEverything();

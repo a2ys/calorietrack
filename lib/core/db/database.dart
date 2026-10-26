@@ -253,6 +253,22 @@ class AppDatabase extends _$AppDatabase {
     return q.watch();
   }
 
+  /// Millilitres drunk on each calendar day in [from, toExclusive), keyed by
+  /// date. Days without drinks are absent from the map.
+  Stream<Map<DateTime, int>> watchDailyWater(DateTime from, DateTime toExclusive) {
+    final q = select(waterLogs)
+      ..where((w) => w.loggedAt.isBiggerOrEqualValue(from))
+      ..where((w) => w.loggedAt.isSmallerThanValue(toExclusive));
+    return q.watch().map((rows) {
+      final out = <DateTime, int>{};
+      for (final w in rows) {
+        final day = dateOnly(w.loggedAt);
+        out[day] = (out[day] ?? 0) + w.amountMl;
+      }
+      return out;
+    });
+  }
+
   Future<int> addWater(int amountMl, DateTime at) => into(waterLogs)
       .insert(WaterLogsCompanion.insert(amountMl: amountMl, loggedAt: at));
 
