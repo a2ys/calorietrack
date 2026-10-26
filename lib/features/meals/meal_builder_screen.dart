@@ -59,6 +59,20 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
     });
   }
 
+  /// The picker's "−": takes [qty] servings of [food] back out.
+  void _unpick(Food food, double qty) {
+    final i = _items.indexWhere((m) => m.name == food.name && m.serving == food.serving);
+    if (i < 0) return;
+    setState(() {
+      final left = _items[i].qty - qty;
+      if (left <= 0) {
+        _items.removeAt(i);
+      } else {
+        _items[i] = _items[i].withQty(left);
+      }
+    });
+  }
+
   void _setQty(int i, double qty) {
     final next = qty.clamp(0.5, 30.0);
     if (next == _items[i].qty) return;
@@ -242,7 +256,7 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
                     style: _items.isEmpty ? AppButtonStyle.primary : AppButtonStyle.outline,
                     onPressed: () {
                       FocusScope.of(context).unfocus();
-                      showFoodPickerSheet(context, onPick: _addItem);
+                      showFoodPickerSheet(context, onPick: _addItem, onUnpick: _unpick);
                     },
                   ),
                 ],
@@ -392,9 +406,13 @@ class _IngredientRow extends StatelessWidget {
                 ],
               ),
             ),
-            _Step(icon: AppIcons.minus, onTap: () => onQty(item.qty - 0.5), enabled: item.qty > 0.5),
+            // At the smallest amount "−" becomes remove, so deleting never
+            // depends on discovering the swipe.
+            item.qty > 0.5
+                ? _Step(icon: AppIcons.minus, onTap: () => onQty(item.qty - 0.5), enabled: true)
+                : _Step(icon: AppIcons.trash, onTap: onRemove, enabled: true, destructive: true),
             SizedBox(
-              width: 40,
+              width: 32,
               child: Text(formatQty(item.qty), textAlign: TextAlign.center, style: t.numeralS),
             ),
             _Step(icon: AppIcons.plus, onTap: () => onQty(item.qty + 0.5), enabled: true),
@@ -406,10 +424,11 @@ class _IngredientRow extends StatelessWidget {
 }
 
 class _Step extends StatelessWidget {
-  const _Step({required this.icon, required this.onTap, required this.enabled});
+  const _Step({required this.icon, required this.onTap, required this.enabled, this.destructive = false});
   final AppIconData icon;
   final VoidCallback onTap;
   final bool enabled;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
@@ -420,11 +439,22 @@ class _Step extends StatelessWidget {
       child: AnimatedOpacity(
         duration: AppMotion.fast,
         opacity: enabled ? 1 : 0.3,
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(color: p.surfaceAlt, shape: BoxShape.circle),
-          child: AppIcon(icon, size: 14, color: p.textPrimary),
+        // 40px hit area around a 32px visual.
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Center(
+            child: AnimatedContainer(
+              duration: AppMotion.fast,
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: destructive ? p.accent.withValues(alpha: 0.12) : p.surfaceAlt,
+                shape: BoxShape.circle,
+              ),
+              child: AppIcon(icon, size: 14, color: destructive ? p.accent : p.textPrimary),
+            ),
+          ),
         ),
       ),
     );

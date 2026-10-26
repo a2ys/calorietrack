@@ -46,16 +46,21 @@ class CalorieHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CountUpText(
-                  value: big,
-                  style: t.numeralXL.copyWith(
-                    color: over ? p.accent : p.textPrimary,
+                // Scale down rather than wrap when 4-digit values meet a narrow card.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: CountUpText(
+                    value: big,
+                    style: t.numeralXL.copyWith(
+                      color: over ? p.accent : p.textPrimary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(label, style: t.label),
                 const SizedBox(height: AppSpacing.xxs),
-                Text(sub, style: t.caption),
+                Text(sub, style: t.caption.copyWith(color: p.textSecondary)),
               ],
             ),
           ),
@@ -138,7 +143,7 @@ class _MacroTile extends StatelessWidget {
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      radius: BorderRadius.circular(AppRadii.lg - AppSpacing.xs),
+      radius: AppRadii.tile,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

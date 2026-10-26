@@ -49,7 +49,7 @@ class ConfirmDialog extends StatelessWidget {
                 height: AppSizes.button,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(color: p.accent, borderRadius: AppRadii.chip),
-                child: Text(confirmLabel, style: t.button.copyWith(color: Colors.white)),
+                child: Text(confirmLabel, style: t.button.copyWith(color: p.onInk)),
               ),
             ),
           ],

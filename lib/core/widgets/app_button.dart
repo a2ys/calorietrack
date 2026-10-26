@@ -4,9 +4,10 @@ import '../theme/app_theme.dart';
 import 'app_icon.dart';
 import 'press_scale.dart';
 
-enum AppButtonStyle { primary, outline }
+enum AppButtonStyle { primary, outline, danger }
 
-/// Full-width pill button: solid ink (black / white) or outlined.
+/// Full-width pill button: solid ink (black / white), outlined, or a
+/// destructive outline (accent text and border, transparent fill).
 class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
@@ -27,7 +28,8 @@ class AppButton extends StatelessWidget {
     final t = context.type;
     final primary = style == AppButtonStyle.primary;
     final enabled = onPressed != null;
-    final fg = primary ? p.onInk : p.textPrimary;
+    final danger = style == AppButtonStyle.danger;
+    final fg = primary ? p.onInk : (danger ? p.accent : p.textPrimary);
 
     return PressScale(
       onTap: onPressed,
@@ -40,17 +42,23 @@ class AppButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: primary ? p.ink : Colors.transparent,
             borderRadius: AppRadii.chip,
-            border: primary ? null : Border.all(color: p.ink, width: 1.5),
+            border: primary ? null : Border.all(color: danger ? p.accent : p.ink, width: 1.5),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                AppIcon(icon!, color: fg, size: 20),
-                const SizedBox(width: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          // Long labels ("Done · 1,250 kcal" in a half-width button) shrink
+          // a little instead of overflowing.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  AppIcon(icon!, color: fg, size: 20),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Text(label, style: t.button.copyWith(color: fg)),
               ],
-              Text(label, style: t.button.copyWith(color: fg)),
-            ],
+            ),
           ),
         ),
       ),

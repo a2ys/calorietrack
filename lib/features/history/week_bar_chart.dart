@@ -57,11 +57,6 @@ class WeekBarChart extends StatelessWidget {
                 painter: _GoalLinePainter(y: goalY, color: p.textTertiary),
               ),
             ),
-            Positioned(
-              right: 0,
-              top: goalY - _goalLabelHeight,
-              child: Text('Goal $target', style: t.caption),
-            ),
             Row(
               children: [
                 for (var i = 0; i < 7; i++)
@@ -82,6 +77,14 @@ class WeekBarChart extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+            // Painted after the bars so a tall bar never hides it.
+            Positioned(
+              left: 0,
+              top: goalY - _goalLabelHeight,
+              child: IgnorePointer(
+                child: Text('Goal $target kcal', style: t.caption.copyWith(color: p.textSecondary)),
+              ),
             ),
           ],
         );
@@ -161,7 +164,11 @@ class _Bar extends StatelessWidget {
           Text(
             weekdayInitial(day),
             style: t.caption.copyWith(
-              color: selected ? p.textPrimary : p.textTertiary,
+              color: selected
+                  ? p.textPrimary
+                  : future
+                      ? p.textTertiary
+                      : p.textSecondary,
             ),
           ),
           Text(

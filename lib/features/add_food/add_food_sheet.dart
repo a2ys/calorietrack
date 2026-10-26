@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,6 +16,7 @@ import '../../core/utils/calorie_calculator.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/add_circle.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/count_up_text.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/macro_icons.dart';
@@ -41,23 +43,38 @@ Future<void> showAddFoodSheet(
 
 /// Opens the same food browser, but hands each pick to [onPick] instead of
 /// logging it (used when building a meal).
+/// [onUnpick] takes a pick back (the "−" on a row that was just added).
 Future<void> showFoodPickerSheet(
   BuildContext context, {
   required void Function(Food food, double qty) onPick,
+  void Function(Food food, double qty)? onUnpick,
   String title = 'Add ingredient',
 }) {
   return showAppSheet<void>(
     context,
     initialSize: 0.9,
     maxSize: 0.96,
-    builder: (_) => AddFoodSheet(picker: FoodPicker(title: title, onPick: onPick)),
+    builder: (_) => AddFoodSheet(
+      picker: FoodPicker(title: title, onPick: onPick, onUnpick: onUnpick),
+    ),
   );
 }
 
 class FoodPicker {
-  const FoodPicker({required this.title, required this.onPick});
+  const FoodPicker({required this.title, required this.onPick, this.onUnpick});
   final String title;
   final void Function(Food food, double qty) onPick;
+  final void Function(Food food, double qty)? onUnpick;
+}
+
+/// One add made during this visit, kept so it can be taken back: the logged
+/// entry's id, or (when picking) the food handed to the meal builder.
+class _Added {
+  const _Added({required this.kcal, this.entryId, this.food, this.qty = 1});
+  final int kcal;
+  final int? entryId;
+  final Food? food;
+  final double qty;
 }
 
 enum _Kind { recent, popular, meals, mine, group }
@@ -90,7 +107,8 @@ class AddFoodSheet extends ConsumerStatefulWidget {
   ConsumerState<AddFoodSheet> createState() => _AddFoodSheetState();
 }
 
-class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
+class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
+    with SingleTickerProviderStateMixin {
   static const double _searchHeaderHeight = 116;
 
   late MealType _meal = widget.editing?.mealType ?? MealType.forTime(DateTime.now());
@@ -101,10 +119,18 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
   Food? _detail;
   String _customName = '';
 
-  /// What was added during this visit: times per food name, plus totals.
-  final Map<String, int> _times = {};
+  /// What was added during this visit, per food name, plus totals.
+  final Map<String, List<_Added>> _added = {};
   int _addedCount = 0;
   int _addedKcal = 0;
+
+  /// Horizontal offset of the list while swiping between chips. Driven 1:1
+  /// by the finger, then by a spring ([_swipe]) when let go.
+  final _shift = ValueNotifier<double>(0);
+  late final AnimationController _swipe = AnimationController.unbounded(vsync: this)
+    ..addListener(() => _shift.value = _swipe.value);
+  final _chipsScroll = ScrollController();
+  final Map<_Chip, GlobalKey> _chipKeys = {};
 
   bool get _picking => widget.picker != null;
   bool get _editing => widget.editing != null;
@@ -119,6 +145,9 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
   @override
   void dispose() {
     _search.dispose();
+    _swipe.dispose();
+    _shift.dispose();
+    _chipsScroll.dispose();
     super.dispose();
   }
 
@@ -132,15 +161,42 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
 
   // ------------------------------------------------------------ logging
 
-  void _countAdded(String name, int kcal) {
+  void _countAdded(String name, _Added a) {
     setState(() {
-      _times[name] = (_times[name] ?? 0) + 1;
+      (_added[name] ??= []).add(a);
       _addedCount++;
-      _addedKcal += kcal;
+      _addedKcal += a.kcal;
     });
   }
 
-  Future<void> _insert(String name, String emoji, Totals t) {
+  int _countOf(String name) => _added[name]?.length ?? 0;
+
+  /// Whether the latest add of [name] can be taken back from the row.
+  bool _canRemove(String name) {
+    final last = _added[name]?.lastOrNull;
+    if (last == null) return false;
+    return last.entryId != null || (last.food != null && widget.picker?.onUnpick != null);
+  }
+
+  /// Takes back the latest add of [name]: deletes the logged entry, or hands
+  /// the food back out of the meal being built.
+  Future<void> _removeLast(String name) async {
+    final list = _added[name];
+    if (list == null || list.isEmpty || !_canRemove(name)) return;
+    final last = list.removeLast();
+    if (list.isEmpty) _added.remove(name);
+    setState(() {
+      _addedCount--;
+      _addedKcal -= last.kcal;
+    });
+    if (last.entryId != null) {
+      await ref.read(databaseProvider).deleteEntry(last.entryId!);
+    } else {
+      widget.picker!.onUnpick!(last.food!, last.qty);
+    }
+  }
+
+  Future<int> _insert(String name, String emoji, Totals t) {
     return ref.read(databaseProvider).addEntry(
           FoodEntriesCompanion.insert(
             name: name,
@@ -156,23 +212,29 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
   }
 
   /// Logs [qty] servings of [food] (or hands them to the meal builder).
-  Future<void> _add(Food food, double qty) async {
+  /// [note] replaces the "× 2" suffix, e.g. "50 g" for a weighed portion.
+  Future<void> _add(Food food, double qty, {String? note}) async {
     final t = food.scaled(qty);
+    int? id;
     if (_picking) {
       widget.picker!.onPick(food, qty);
     } else {
-      final name = qty == 1 ? food.name : '${food.name} × ${formatQty(qty)}';
-      await _insert(name, food.emoji, t);
+      final name = note != null
+          ? '${food.name} · $note'
+          : qty == 1
+              ? food.name
+              : '${food.name} × ${formatQty(qty)}';
+      id = await _insert(name, food.emoji, t);
     }
     Haptics.success();
-    _countAdded(food.name, t.kcal);
+    _countAdded(food.name, _Added(kcal: t.kcal, entryId: id, food: food, qty: qty));
   }
 
   Future<void> _addMeal(String name, String emoji, List<MealItem> items) async {
     final t = sumMealItems(items);
-    await _insert(name, emoji, t);
+    final id = await _insert(name, emoji, t);
     Haptics.success();
-    _countAdded(name, t.kcal);
+    _countAdded(name, _Added(kcal: t.kcal, entryId: id));
   }
 
   Future<void> _openMeal(String name, String emoji, List<MealItem> items,
@@ -186,13 +248,16 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
       day: widget.day,
       mealType: _meal,
     );
-    if (logged == true) _countAdded(name, sumMealItems(items).kcal);
+    // Logged from the detail sheet: counted, but its entry id isn't known
+    // here, so the row shows the count without a "−".
+    if (logged == true) _countAdded(name, _Added(kcal: sumMealItems(items).kcal));
   }
 
   Future<void> _submitCustom(_Draft d) async {
     final db = ref.read(databaseProvider);
     final existing = widget.editing;
     final t = Totals(kcal: d.kcal, protein: d.protein, carbs: d.carbs, fat: d.fat);
+    Food? picked;
 
     if (existing != null) {
       await db.updateEntry(existing.copyWith(
@@ -204,19 +269,17 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
         mealType: _meal,
       ));
     } else if (_picking) {
-      widget.picker!.onPick(
-        Food(
-          name: d.name,
-          emoji: AppEmoji.custom,
-          group: FoodGroup.other,
-          serving: '1 serving',
-          kcal: d.kcal,
-          protein: d.protein,
-          carbs: d.carbs,
-          fat: d.fat,
-        ),
-        1,
+      picked = Food(
+        name: d.name,
+        emoji: AppEmoji.custom,
+        group: FoodGroup.other,
+        serving: '1 serving',
+        kcal: d.kcal,
+        protein: d.protein,
+        carbs: d.carbs,
+        fat: d.fat,
       );
+      widget.picker!.onPick(picked, 1);
     } else {
       await _insert(d.name, AppEmoji.custom, t);
     }
@@ -235,11 +298,33 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
 
     Haptics.success();
     if (_picking) {
-      _countAdded(d.name, d.kcal);
+      _countAdded(d.name, _Added(kcal: d.kcal, food: picked));
       _goBrowse();
     } else if (mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  /// Deletes the entry being edited. The undo goes on the screen below,
+  /// which is visible once the sheet has closed.
+  Future<void> _deleteEditing() async {
+    final entry = widget.editing!;
+    final db = ref.read(databaseProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final p = context.palette;
+    await db.deleteEntry(entry.id);
+    Haptics.medium();
+    if (mounted) Navigator.of(context).pop();
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Text('Deleted ${entry.name}'),
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: p.onInk,
+          onPressed: () => db.addEntry(entry.toCompanion(false)),
+        ),
+      ));
   }
 
   // --------------------------------------------------------- navigation
@@ -266,6 +351,21 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
     _scrollToTop();
   }
 
+  Future<void> _deleteCustom(CustomFood f) async {
+    final ok = await showAppDialog<bool>(
+      context,
+      builder: (_) => ConfirmDialog(
+        title: 'Remove ${f.name}?',
+        message: 'It disappears from My foods. Anything you already logged stays.',
+        confirmLabel: 'Remove',
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(databaseProvider).deleteCustomFood(f.id);
+    Haptics.medium();
+    _goBrowse();
+  }
+
   void _scrollToTop() {
     final c = SheetScope.maybeOf(context);
     if (c != null && c.hasClients) c.jumpTo(0);
@@ -281,6 +381,80 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
         for (final g in FoodGroup.values) _Chip(_Kind.group, g.label, g.emoji, g),
       ];
 
+  /// Selects [next], sliding the list in from the side it lives on.
+  /// [velocity] carries a swipe's speed into the landing spring.
+  void _selectChip(List<_Chip> chips, _Chip next, {double velocity = 0}) {
+    if (next == _chip && _query.isEmpty) return;
+    final from = chips.indexOf(_chip!);
+    final to = chips.indexOf(next);
+    Haptics.tap();
+    _search.clear();
+    setState(() => _chip = next);
+    _scrollToTop();
+    _revealChip(next);
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    // Enter from the side of the new chip, then settle with no overshoot.
+    final width = MediaQuery.sizeOf(context).width;
+    final dir = to >= from ? 1.0 : -1.0;
+    _settle(from: dir * width * 0.28, velocity: velocity);
+  }
+
+  void _settle({required double from, double velocity = 0}) {
+    _swipe.value = from;
+    _swipe.animateWith(SpringSimulation(
+      SpringDescription.withDampingRatio(mass: 1, stiffness: 420, ratio: 1),
+      from,
+      0,
+      velocity,
+    ));
+  }
+
+  /// Keeps the selected chip visible in its strip.
+  void _revealChip(_Chip c) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _chipKeys[c]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(ctx, alignment: 0.5, duration: AppMotion.slow, curve: AppMotion.easeOut);
+    });
+  }
+
+  /// Grabbing mid-settle picks the list up where it is (interruptible).
+  void _onSwipeStart(DragStartDetails _) {
+    _swipe.stop();
+    _rawShift = _shift.value;
+  }
+
+  void _onSwipeUpdate(DragUpdateDetails d, List<_Chip> chips) {
+    if (_query.isNotEmpty) return;
+    _rawShift += d.delta.dx;
+    final i = chips.indexOf(_chip!);
+    // Past the first or last chip there is nowhere to go: resist instead.
+    final atEdge = (_rawShift > 0 && i == 0) || (_rawShift < 0 && i == chips.length - 1);
+    _shift.value = atEdge ? _rubberband(_rawShift, MediaQuery.sizeOf(context).width) : _rawShift;
+  }
+
+  double _rawShift = 0;
+
+  static double _rubberband(double x, double dim, [double c = 0.55]) =>
+      (x * dim * c) / (dim + c * x.abs());
+
+  void _onSwipeEnd(DragEndDetails d, List<_Chip> chips) {
+    if (_query.isNotEmpty) return;
+    final width = MediaQuery.sizeOf(context).width;
+    final v = d.primaryVelocity ?? 0;
+    // Project where the flick is heading (Apple's decay), not where it let go.
+    final projected = _shift.value + (v / 1000) * 0.99 / (1 - 0.99);
+    final i = chips.indexOf(_chip!);
+    _rawShift = 0;
+    if (projected < -width * 0.3 && i < chips.length - 1) {
+      _selectChip(chips, chips[i + 1], velocity: v);
+    } else if (projected > width * 0.3 && i > 0) {
+      _selectChip(chips, chips[i - 1], velocity: v);
+    } else {
+      _settle(from: _shift.value, velocity: v);
+    }
+  }
+
   // -------------------------------------------------------------- build
 
   @override
@@ -293,6 +467,9 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
     final chips = _chips(hasRecents: recents.isNotEmpty, hasMine: mine.isNotEmpty);
     _chip ??= chips.first;
     if (!chips.contains(_chip)) _chip = chips.first;
+    for (final c in chips) {
+      _chipKeys.putIfAbsent(c, GlobalKey.new);
+    }
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final showFooter = _page == _Page.browse && !_editing;
@@ -304,9 +481,17 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
             ? widget.picker!.title
             : 'Add food';
 
+    final browsing = _page == _Page.browse;
+
     return Stack(
       children: [
-        CustomScrollView(
+        // Swipe anywhere on the list to move between chips. The chip strip
+        // and text field win their own drags, so this only sees the rest.
+        GestureDetector(
+          onHorizontalDragStart: browsing ? _onSwipeStart : null,
+          onHorizontalDragUpdate: browsing ? (d) => _onSwipeUpdate(d, chips) : null,
+          onHorizontalDragEnd: browsing ? (d) => _onSwipeEnd(d, chips) : null,
+          child: CustomScrollView(
           controller: SheetScope.maybeOf(context),
           physics: sheetScrollPhysics,
           slivers: [
@@ -332,12 +517,10 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
                   child: _SearchAndChips(
                     controller: _search,
                     chips: chips,
+                    chipKeys: _chipKeys,
+                    scrollController: _chipsScroll,
                     selected: _query.isEmpty ? _chip : null,
-                    onChip: (c) {
-                      Haptics.tap();
-                      _search.clear();
-                      setState(() => _chip = c);
-                    },
+                    onChip: (c) => _selectChip(chips, c),
                   ),
                 ),
               ),
@@ -355,10 +538,13 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
                   child: _FoodDetail(
                     food: _detail!,
                     mealLabel: _picking ? null : _meal.label.toLowerCase(),
-                    onAdd: (qty) async {
-                      await _add(_detail!, qty);
+                    onAdd: (food, qty, note) async {
+                      await _add(food, qty, note: note);
                       _goBrowse();
                     },
+                    onDelete: _customFor(_detail!, mine) == null
+                        ? null
+                        : () => _deleteCustom(_customFor(_detail!, mine)!),
                   ),
                 ),
               )
@@ -376,10 +562,12 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
                             : 'Add to ${_meal.label.toLowerCase()}',
                     allowSave: !_editing && !_picking,
                     onSubmit: _submitCustom,
+                    onDelete: _editing ? _deleteEditing : null,
                   ),
                 ),
               ),
           ],
+          ),
         ),
         if (showFooter)
           Positioned(
@@ -421,9 +609,10 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
     Widget foodRow(Food f) => _FoodRow(
           key: ValueKey('food-${f.name}-${f.serving}'),
           food: f,
-          count: _times[f.name] ?? 0,
+          count: _countOf(f.name),
           onOpen: () => _openDetail(f),
           onAdd: () => _add(f, 1),
+          onRemove: _canRemove(f.name) ? () => _removeLast(f.name) : null,
         );
 
     if (query.isNotEmpty) {
@@ -443,7 +632,9 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
             if (f != null) rows.add(foodRow(f));
           }
         case _Kind.mine:
-          rows.addAll(mine.map((f) => _mineRow(f, foodRow)));
+          // Deleting lives on the food's detail page: a swipe here would
+          // fight the swipe between chips.
+          rows.addAll(mine.map((f) => foodRow(_foodFromCustom(f))));
         case _Kind.group:
           rows.addAll(catalog.inGroup(_chip!.group!).map(foodRow));
         case _Kind.meals:
@@ -454,52 +645,24 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
     return [
       SliverList.builder(
         itemCount: rows.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screen),
-          child: rows[i],
+        itemBuilder: (_, i) => _Shifted(
+          shift: _shift,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screen),
+            child: rows[i],
+          ),
         ),
       ),
       SliverToBoxAdapter(child: SizedBox(height: footerHeight + AppSpacing.lg)),
     ];
   }
 
-  Widget _mineRow(CustomFood f, Widget Function(Food) foodRow) {
-    final db = ref.read(databaseProvider);
-    final p = context.palette;
-    return Dismissible(
-      key: ValueKey('custom-${f.id}'),
-      direction: DismissDirection.endToStart,
-      onUpdate: (d) {
-        if (d.reached && !d.previousReached) Haptics.light();
-      },
-      onDismissed: (_) {
-        db.deleteCustomFood(f.id);
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(
-            content: Text('Removed ${f.name}'),
-            action: SnackBarAction(
-              label: 'Undo',
-              textColor: p.onInk,
-              onPressed: () => db.addCustomFood(CustomFoodsCompanion.insert(
-                name: f.name,
-                kcal: f.kcal,
-                protein: Value(f.protein),
-                carbs: Value(f.carbs),
-                fat: Value(f.fat),
-                emoji: Value(f.emoji),
-                createdAt: f.createdAt,
-              )),
-            ),
-          ));
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppSpacing.lg),
-        child: AppIcon(AppIcons.trash, color: p.accent),
-      ),
-      child: foodRow(_foodFromCustom(f)),
-    );
+  CustomFood? _customFor(Food f, List<CustomFood> mine) {
+    if (f.serving != '1 serving' || f.group != FoodGroup.other) return null;
+    for (final c in mine) {
+      if (c.name == f.name && c.kcal == f.kcal) return c;
+    }
+    return null;
   }
 
   List<Widget> _mealRows(FoodCatalog catalog, List<SavedMeal> saved) {
@@ -513,9 +676,10 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
           emoji: m.emoji,
           name: m.name,
           items: items,
-          count: _times[m.name] ?? 0,
+          count: _countOf(m.name),
           onOpen: () => _openMeal(m.name, m.emoji, items, saved: m),
           onAdd: () => _addMeal(m.name, m.emoji, items),
+          onRemove: _canRemove(m.name) ? () => _removeLast(m.name) : null,
         ));
       }
     }
@@ -528,9 +692,10 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet> {
         emoji: m.emoji,
         name: m.name,
         items: items,
-        count: _times[m.name] ?? 0,
+        count: _countOf(m.name),
         onOpen: () => _openMeal(m.name, m.emoji, items),
         onAdd: () => _addMeal(m.name, m.emoji, items),
+        onRemove: _canRemove(m.name) ? () => _removeLast(m.name) : null,
       ));
     }
     return out;
@@ -703,12 +868,16 @@ class _SearchAndChips extends StatelessWidget {
   const _SearchAndChips({
     required this.controller,
     required this.chips,
+    required this.chipKeys,
+    required this.scrollController,
     required this.selected,
     required this.onChip,
   });
 
   final TextEditingController controller;
   final List<_Chip> chips;
+  final Map<_Chip, GlobalKey> chipKeys;
+  final ScrollController scrollController;
   final _Chip? selected;
   final ValueChanged<_Chip> onChip;
 
@@ -766,11 +935,13 @@ class _SearchAndChips extends StatelessWidget {
         SizedBox(
           height: 40,
           child: ListView.separated(
+            controller: scrollController,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screen),
             itemCount: chips.length,
             separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
             itemBuilder: (_, i) => _ChipPill(
+              key: chipKeys[chips[i]],
               chip: chips[i],
               selected: chips[i] == selected,
               onTap: () => onChip(chips[i]),
@@ -784,7 +955,7 @@ class _SearchAndChips extends StatelessWidget {
 }
 
 class _ChipPill extends StatelessWidget {
-  const _ChipPill({required this.chip, required this.selected, required this.onTap});
+  const _ChipPill({super.key, required this.chip, required this.selected, required this.onTap});
 
   final _Chip chip;
   final bool selected;
@@ -844,12 +1015,14 @@ class _FoodRow extends StatelessWidget {
     required this.count,
     required this.onOpen,
     required this.onAdd,
+    this.onRemove,
   });
 
   final Food food;
   final int count;
   final VoidCallback onOpen;
   final VoidCallback onAdd;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -878,7 +1051,7 @@ class _FoodRow extends StatelessWidget {
                 ],
               ),
             ),
-            AddCircle(count: count, onTap: onAdd),
+            AddCircle(count: count, onTap: onAdd, onRemove: onRemove),
           ],
         ),
       ),
@@ -895,6 +1068,7 @@ class _MealRow extends StatelessWidget {
     required this.count,
     required this.onOpen,
     required this.onAdd,
+    this.onRemove,
   });
 
   final String emoji;
@@ -903,6 +1077,7 @@ class _MealRow extends StatelessWidget {
   final int count;
   final VoidCallback onOpen;
   final VoidCallback onAdd;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -932,7 +1107,7 @@ class _MealRow extends StatelessWidget {
                 ],
               ),
             ),
-            AddCircle(count: count, onTap: onAdd),
+            AddCircle(count: count, onTap: onAdd, onRemove: onRemove),
           ],
         ),
       ),
@@ -1042,6 +1217,28 @@ class _Footer extends StatelessWidget {
 
 // ------------------------------------------------------- page motion
 
+/// A list row offset by the chip swipe, fading as it travels.
+class _Shifted extends StatelessWidget {
+  const _Shifted({required this.shift, required this.child});
+  final ValueNotifier<double> shift;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return ValueListenableBuilder<double>(
+      valueListenable: shift,
+      child: child,
+      builder: (context, dx, child) => dx == 0
+          ? child!
+          : Opacity(
+              opacity: (1 - dx.abs() / width * 1.6).clamp(0.0, 1.0),
+              child: Transform.translate(offset: Offset(dx, 0), child: child),
+            ),
+    );
+  }
+}
+
 /// New pages inside the sheet slide in from the right like a push.
 class _SlideIn extends StatefulWidget {
   const _SlideIn({super.key, required this.child});
@@ -1084,22 +1281,54 @@ class _SlideInState extends State<_SlideIn> with SingleTickerProviderStateMixin 
 // ------------------------------------------------------- food detail
 
 class _FoodDetail extends StatefulWidget {
-  const _FoodDetail({required this.food, required this.mealLabel, required this.onAdd});
+  const _FoodDetail({
+    required this.food,
+    required this.mealLabel,
+    required this.onAdd,
+    this.onDelete,
+  });
 
   final Food food;
   final String? mealLabel;
-  final Future<void> Function(double qty) onAdd;
+  /// Adds [qty] of the given food: the original for servings, or a copy
+  /// portioned to the weighed grams (then [note] is e.g. "50 g").
+  final Future<void> Function(Food food, double qty, String? note) onAdd;
+
+  /// Set for the user's own foods: removes it from My foods.
+  final VoidCallback? onDelete;
 
   @override
   State<_FoodDetail> createState() => _FoodDetailState();
 }
 
+enum _Unit { servings, grams }
+
 class _FoodDetailState extends State<_FoodDetail> {
   static const double _step = 0.5;
   static const double _min = 0.5;
   static const double _max = 30;
+  static const int _gramStep = 10;
+  static const int _gramMax = 3000;
+  static const List<int> _gramPresets = [50, 100, 150, 200];
 
   double _qty = 1;
+  _Unit _unit = _Unit.servings;
+  late int _g = widget.food.grams ?? 100;
+  late final _gramsField = TextEditingController(text: '$_g');
+
+  /// Weighing needs the serving's weight to scale from.
+  bool get _canWeigh => (widget.food.grams ?? 0) > 0;
+  bool get _weighing => _unit == _Unit.grams;
+
+  /// What "Add" adds: N servings, or the food re-portioned to [_g] grams.
+  Food get _food => _weighing ? widget.food.withGrams(_g) : widget.food;
+  double get _amount => _weighing ? 1 : _qty;
+
+  @override
+  void dispose() {
+    _gramsField.dispose();
+    super.dispose();
+  }
 
   void _change(double delta) {
     final next = (_qty + delta).clamp(_min, _max);
@@ -1108,12 +1337,29 @@ class _FoodDetailState extends State<_FoodDetail> {
     setState(() => _qty = next);
   }
 
+  /// [typed] skips the haptic and leaves the field alone while the user types.
+  void _setGrams(int g, {bool typed = false}) {
+    final next = g.clamp(1, _gramMax);
+    if (next == _g) return;
+    setState(() => _g = next);
+    if (!typed) {
+      Haptics.tap();
+      _gramsField.text = '$next';
+    }
+  }
+
+  void _setUnit(_Unit u) {
+    if (u == _unit) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _unit = u);
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.type;
     final p = context.palette;
     final food = widget.food;
-    final total = food.scaled(_qty);
+    final total = _food.scaled(_amount);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Padding(
@@ -1131,38 +1377,67 @@ class _FoodDetailState extends State<_FoodDetail> {
           Text(food.name, style: t.heading, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            food.grams == null ? '1 serving = ${food.serving}' : '1 serving = ${food.serving} · ${food.grams} g',
+            food.grams == null || food.serving.contains('${food.grams} g')
+                ? '1 serving = ${food.serving}'
+                : '1 serving = ${food.serving} · ${food.grams} g',
             style: t.label,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: AppSpacing.xl),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _RoundStep(icon: AppIcons.minus, onTap: () => _change(-_step), enabled: _qty > _min),
-              SizedBox(
-                width: 132,
-                child: Column(
-                  children: [
-                    AnimatedSwitcher(
-                      duration: AppMotion.fast,
-                      switchInCurve: AppMotion.easeOut,
-                      transitionBuilder: (child, a) => FadeTransition(
-                        opacity: a,
-                        child: ScaleTransition(scale: Tween<double>(begin: 0.8, end: 1).animate(a), child: child),
-                      ),
-                      child: Text(
-                        formatQty(_qty),
-                        key: ValueKey(_qty),
-                        style: t.numeralL,
-                      ),
-                    ),
-                    Text(_qty == 1 ? 'serving' : 'servings', style: t.label),
-                  ],
+          if (_canWeigh) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: SizedBox(
+                width: 220,
+                child: SegmentedPills<_Unit>(
+                  compact: true,
+                  options: _Unit.values,
+                  labelOf: (u) => u == _Unit.servings ? 'Servings' : 'Grams',
+                  selected: _unit,
+                  onChanged: _setUnit,
                 ),
               ),
-              _RoundStep(icon: AppIcons.plus, onTap: () => _change(_step), enabled: _qty < _max),
-            ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          AnimatedSize(
+            duration: AppMotion.normal,
+            curve: AppMotion.springSoft,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: AppMotion.fast,
+              switchInCurve: AppMotion.easeOut,
+              child: _weighing
+                  ? _gramsPicker(t, p)
+                  : Row(
+                      key: const ValueKey('servings'),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _RoundStep(icon: AppIcons.minus, onTap: () => _change(-_step), enabled: _qty > _min),
+                        SizedBox(
+                          width: 132,
+                          child: Column(
+                            children: [
+                              AnimatedSwitcher(
+                                duration: AppMotion.fast,
+                                switchInCurve: AppMotion.easeOut,
+                                transitionBuilder: (child, a) => FadeTransition(
+                                  opacity: a,
+                                  child: ScaleTransition(scale: Tween<double>(begin: 0.8, end: 1).animate(a), child: child),
+                                ),
+                                child: Text(
+                                  formatQty(_qty),
+                                  key: ValueKey(_qty),
+                                  style: t.numeralL,
+                                ),
+                              ),
+                              Text(_qty == 1 ? 'serving' : 'servings', style: t.label),
+                            ],
+                          ),
+                        ),
+                        _RoundStep(icon: AppIcons.plus, onTap: () => _change(_step), enabled: _qty < _max),
+                      ],
+                    ),
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Container(
@@ -1202,7 +1477,7 @@ class _FoodDetailState extends State<_FoodDetail> {
                           children: [
                             Emoji(kind.emoji, size: 20),
                             const SizedBox(height: AppSpacing.xs),
-                            Text('${grams.toStringAsFixed(grams < 10 ? 1 : 0)} g', style: t.numeralS),
+                            Text('${grams.toStringAsFixed(grams < 10 ? 1 : 0)}g', style: t.numeralS),
                             Text(kind.label, style: t.caption),
                           ],
                         ),
@@ -1217,9 +1492,135 @@ class _FoodDetailState extends State<_FoodDetail> {
             label: widget.mealLabel == null
                 ? 'Add ingredient'
                 : 'Add to ${widget.mealLabel} · ${total.kcal} kcal',
-            onPressed: () => widget.onAdd(_qty),
+            onPressed: () => widget.onAdd(_food, _amount, _weighing ? '$_g g' : null),
           ),
+          if (widget.onDelete != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            PressScale(
+              onTap: widget.onDelete,
+              child: SizedBox(
+                height: 44,
+                child: Center(
+                  child: Text(
+                    'Remove from my foods',
+                    style: t.bodyStrong.copyWith(color: p.accent),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+extension on _FoodDetailState {
+  /// Big typeable gram count with ±10 g steps and one-tap common weights.
+  Widget _gramsPicker(AppTypography t, AppPalette p) {
+    final serving = widget.food.grams!;
+    final presets = {..._FoodDetailState._gramPresets, serving}.toList()..sort();
+    return Column(
+      key: const ValueKey('grams'),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _RoundStep(
+              icon: AppIcons.minus,
+              onTap: () => _setGrams(_g - _FoodDetailState._gramStep),
+              enabled: _g > _FoodDetailState._gramStep,
+            ),
+            SizedBox(
+              width: 132,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _gramsField,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(4),
+                    ],
+                    style: t.numeralL,
+                    cursorColor: p.ink,
+                    onChanged: (v) {
+                      final g = int.tryParse(v);
+                      if (g != null && g > 0) _setGrams(g, typed: true);
+                    },
+                    // The theme's filled field would box in the big number.
+                    decoration: const InputDecoration(
+                      isCollapsed: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
+                  ),
+                  Text('grams', style: t.label),
+                ],
+              ),
+            ),
+            _RoundStep(
+              icon: AppIcons.plus,
+              onTap: () => _setGrams(_g + _FoodDetailState._gramStep),
+              enabled: _g < _FoodDetailState._gramMax,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (final g in presets)
+              _GramChip(
+                label: g == serving ? '1 serving · $g g' : '$g g',
+                selected: g == _g,
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                  _setGrams(g);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _GramChip extends StatelessWidget {
+  const _GramChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final t = context.type;
+    return PressScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.normal,
+        curve: AppMotion.easeOut,
+        // No alignment here: an aligned Container stretches to the Wrap's
+        // full width instead of hugging its label.
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2, vertical: AppSpacing.sm + 1),
+        decoration: BoxDecoration(
+          color: selected ? p.ink : p.surfaceAlt,
+          borderRadius: AppRadii.chip,
+        ),
+        child: Text(
+          label,
+          style: t.label.copyWith(
+            color: selected ? p.onInk : p.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -1279,6 +1680,7 @@ class _CustomForm extends StatefulWidget {
     required this.submitLabel,
     required this.allowSave,
     required this.onSubmit,
+    this.onDelete,
   });
 
   final String initialName;
@@ -1286,6 +1688,9 @@ class _CustomForm extends StatefulWidget {
   final String submitLabel;
   final bool allowSave;
   final Future<void> Function(_Draft) onSubmit;
+
+  /// Set when editing a logged entry.
+  final VoidCallback? onDelete;
 
   @override
   State<_CustomForm> createState() => _CustomFormState();
@@ -1431,6 +1836,15 @@ class _CustomFormState extends State<_CustomForm> {
             label: widget.submitLabel,
             onPressed: _valid && !_busy ? _submit : null,
           ),
+          if (widget.onDelete != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppButton(
+              label: 'Delete entry',
+              icon: AppIcons.trash,
+              style: AppButtonStyle.danger,
+              onPressed: _busy ? null : widget.onDelete,
+            ),
+          ],
         ],
       ),
     );

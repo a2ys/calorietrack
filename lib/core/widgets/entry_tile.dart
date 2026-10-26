@@ -12,7 +12,8 @@ import 'emoji.dart';
 import 'macro_icons.dart';
 import 'app_icon.dart';
 
-/// A logged food as a card. Swipe right to edit, left to delete (with undo).
+/// A logged food as a card. Tap or swipe right to edit, swipe left to delete
+/// (with undo); the edit sheet also has a Delete button.
 class EntryTile extends ConsumerWidget {
   const EntryTile({super.key, required this.entry});
 
@@ -34,7 +35,7 @@ class EntryTile extends ConsumerWidget {
           ),
           child: AppIcon(
             edit ? AppIcons.pencil : AppIcons.trash,
-            color: edit ? p.onInk : Colors.white,
+            color: p.onInk,
           ),
         );
 

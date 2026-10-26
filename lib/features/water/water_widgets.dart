@@ -28,8 +28,12 @@ class WaterBar extends StatelessWidget {
               ? Duration.zero
               : const Duration(milliseconds: 700),
           curve: AppMotion.springSoft,
+          // heightFactor matters: the Container's alignment hands its child
+          // loose constraints, and a childless DecoratedBox would collapse to
+          // zero height (the bar used to never visibly fill).
           builder: (context, v, _) => FractionallySizedBox(
             widthFactor: v.clamp(0.0, 1.0),
+            heightFactor: 1,
             child: DecoratedBox(
               decoration: BoxDecoration(color: p.water, borderRadius: AppRadii.chip),
             ),

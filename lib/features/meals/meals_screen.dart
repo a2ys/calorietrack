@@ -67,35 +67,41 @@ class MealsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              PressScale(
-                scale: 0.92,
-                onTap: () {
-                  Haptics.light();
-                  context.push(Routes.mealBuilder);
-                },
-                child: Container(
-                  height: AppSizes.iconTile + 4,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  decoration: BoxDecoration(color: p.ink, borderRadius: AppRadii.chip),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AppIcon(AppIcons.plus, size: 16, color: p.onInk),
-                      const SizedBox(width: AppSpacing.xs + 2),
-                      Text('New meal', style: t.button.copyWith(fontSize: 14)),
-                    ],
+              // The empty state carries its own "Create a meal" CTA, so this
+              // shortcut only appears once there is a list to add to.
+              if (saved.isNotEmpty)
+                PopIn(
+                  child: PressScale(
+                    scale: 0.92,
+                    onTap: () {
+                      Haptics.light();
+                      context.push(Routes.mealBuilder);
+                    },
+                    child: Container(
+                      height: AppSizes.iconTile + 4,
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                      decoration: BoxDecoration(color: p.ink, borderRadius: AppRadii.chip),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon(AppIcons.plus, size: 16, color: p.onInk),
+                          const SizedBox(width: AppSpacing.xs + 2),
+                          Text('New meal', style: t.button.copyWith(fontSize: 14)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
-          if (saved.isEmpty)
+          if (saved.isEmpty) ...[
             StaggeredEntrance(
               index: 0,
               child: _EmptyBuilder(onCreate: () => context.push(Routes.mealBuilder)),
-            )
-          else ...[
+            ),
+            const SizedBox(height: AppSpacing.xxxl),
+          ] else ...[
             const _SectionTitle('My meals'),
             for (var i = 0; i < saved.length; i++)
               Padding(
@@ -112,7 +118,9 @@ class MealsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-            const SizedBox(height: AppSpacing.md),
+            // Cards end with md of padding: md + xl = xxxl, the same gap as
+            // after the empty state.
+            const SizedBox(height: AppSpacing.xl),
           ],
           const _SectionTitle('Quick meals', hint: 'Common plates, ready to log'),
           for (var i = 0; i < kPresetMeals.length; i++)

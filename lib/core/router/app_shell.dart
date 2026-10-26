@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../db/providers.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/haptics.dart';
@@ -8,7 +11,7 @@ import '../widgets/app_icon.dart';
 
 /// Bottom navigation around the four main tabs. Tab switches are instant
 /// (they happen constantly) but the selected icon gives a small spring pop.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
@@ -21,7 +24,7 @@ class AppShell extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = context.palette;
     final t = context.type;
 
@@ -44,6 +47,10 @@ class AppShell extends StatelessWidget {
                       scale: 0.94,
                       onTap: () {
                         if (i != shell.currentIndex) Haptics.tap();
+                        // Tapping Today again while there returns to today.
+                        if (i == 0 && i == shell.currentIndex) {
+                          ref.read(selectedDayProvider.notifier).select(DateTime.now());
+                        }
                         shell.goBranch(i, initialLocation: i == shell.currentIndex);
                       },
                       child: _TabItem(

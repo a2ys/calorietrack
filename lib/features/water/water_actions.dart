@@ -6,13 +6,16 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/utils/water.dart';
 
-/// Logs [ml] of water on [day] (at the current time of day) and offers undo.
-Future<void> logWater(
+/// Logs [ml] of water on [day] (at the current time of day) and returns the new
+/// log's id. Offers undo in a snackbar unless [showUndo] is false: a snackbar
+/// from inside a sheet sits behind it, so the water sheet shows its own undo.
+Future<int> logWater(
   BuildContext context,
   WidgetRef ref,
   DateTime day,
-  int ml,
-) async {
+  int ml, {
+  bool showUndo = true,
+}) async {
   final db = ref.read(databaseProvider);
   final p = context.palette;
   final now = DateTime.now();
@@ -21,7 +24,7 @@ Future<void> logWater(
     DateTime(day.year, day.month, day.day, now.hour, now.minute, now.second),
   );
   Haptics.success();
-  if (!context.mounted) return;
+  if (!showUndo || !context.mounted) return id;
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(SnackBar(
@@ -33,4 +36,5 @@ Future<void> logWater(
         onPressed: () => db.deleteWater(id),
       ),
     ));
+  return id;
 }

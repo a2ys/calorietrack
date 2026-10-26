@@ -148,81 +148,89 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final p = context.palette;
     final first = _step == _Step.welcome;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screen,
-                AppSpacing.md,
-                AppSpacing.screen,
-                0,
-              ),
-              child: SizedBox(
-                height: AppSizes.iconTile,
-                child: Row(
-                  children: [
-                    AnimatedOpacity(
-                      duration: AppMotion.fast,
-                      opacity: first ? 0 : 1,
-                      child: IgnorePointer(
-                        ignoring: first,
-                        child: PressScale(
-                          onTap: _back,
-                          child: Container(
-                            width: AppSizes.iconTile,
-                            height: AppSizes.iconTile,
-                            decoration: BoxDecoration(
-                              color: p.surface,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: p.border),
+    return PopScope(
+      // Android back steps through the flow; only the first step can exit.
+      canPop: first,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back();
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screen,
+                  AppSpacing.md,
+                  AppSpacing.screen,
+                  0,
+                ),
+                child: SizedBox(
+                  height: AppSizes.iconTile,
+                  child: Row(
+                    children: [
+                      AnimatedOpacity(
+                        duration: AppMotion.fast,
+                        opacity: first ? 0 : 1,
+                        child: IgnorePointer(
+                          ignoring: first,
+                          child: PressScale(
+                            onTap: _back,
+                          semanticLabel: 'Back',
+                            child: Container(
+                              width: AppSizes.iconTile,
+                              height: AppSizes.iconTile,
+                              decoration: BoxDecoration(
+                                color: p.surface,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: p.border),
+                              ),
+                              child: AppIcon(AppIcons.caretLeft, size: 16, color: p.textPrimary),
                             ),
-                            child: AppIcon(AppIcons.caretLeft, size: 16, color: p.textPrimary),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.lg),
-                    Expanded(child: _ProgressBar(value: _step.index / (_Step.values.length - 1))),
-                    const SizedBox(width: AppSizes.iconTile + AppSpacing.lg),
+                      const SizedBox(width: AppSpacing.lg),
+                      Expanded(child: _ProgressBar(value: _step.index / (_Step.values.length - 1))),
+                      const SizedBox(width: AppSizes.iconTile + AppSpacing.lg),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: PageView(
+                  controller: _pages,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _welcome(context),
+                    _nameStep(),
+                    _goalStep(),
+                    _sexStep(),
+                    _bodyStep(),
+                    _activityStep(),
+                    _resultStep(),
                   ],
                 ),
               ),
-            ),
-            Expanded(
-              child: PageView(
-                controller: _pages,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _welcome(context),
-                  _nameStep(),
-                  _goalStep(),
-                  _sexStep(),
-                  _bodyStep(),
-                  _activityStep(),
-                  _resultStep(),
-                ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screen,
+                  AppSpacing.md,
+                  AppSpacing.screen,
+                  AppSpacing.xl,
+                ),
+                child: AppButton(
+                  label: switch (_step) {
+                    _Step.welcome => 'Get started',
+                    _Step.name => _nameCtl.text.trim().isEmpty ? 'Skip for now' : 'Continue',
+                    _Step.result => 'Start tracking',
+                    _ => 'Continue',
+                  },
+                  onPressed: _canContinue ? _next : null,
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screen,
-                AppSpacing.md,
-                AppSpacing.screen,
-                AppSpacing.xl,
-              ),
-              child: AppButton(
-                label: switch (_step) {
-                  _Step.welcome => 'Get started',
-                  _Step.name => _nameCtl.text.trim().isEmpty ? 'Skip for now' : 'Continue',
-                  _Step.result => 'Start tracking',
-                  _ => 'Continue',
-                },
-                onPressed: _canContinue ? _next : null,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

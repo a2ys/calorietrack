@@ -2,9 +2,10 @@ import 'package:calorie_app/core/data/food_catalog.dart';
 import 'package:calorie_app/core/db/database.dart';
 import 'package:calorie_app/core/db/providers.dart';
 import 'package:calorie_app/core/theme/app_theme.dart';
+import 'package:calorie_app/core/widgets/add_circle.dart';
+import 'package:calorie_app/core/widgets/app_icon.dart';
 import 'package:calorie_app/features/add_food/add_food_sheet.dart';
 import 'package:drift/native.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,16 @@ void main() {
         ),
       ),
     );
+  }
+
+  Finder icon(AppIconData data) =>
+      find.byWidgetPredicate((w) => w is AppIcon && w.icon == data);
+
+  /// Let a real database write finish, then repaint.
+  Future<void> settleDb(WidgetTester tester) async {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 600));
   }
 
   Future<void> openSheet(WidgetTester tester) async {
@@ -86,11 +97,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'banana');
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-    await tester.tap(find.byIcon(CupertinoIcons.add).first);
-    // Let the real database write finish, then repaint.
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.byType(AddCircle).first);
+    await settleDb(tester);
 
     final rows = await tester.runAsync(() => db.select(db.foodEntries).get());
     expect(rows, hasLength(1));
@@ -112,8 +120,8 @@ void main() {
     expect(find.textContaining('1 serving ='), findsOneWidget);
 
     // Two taps on "+" -> 2 servings (0.5 steps).
-    await tester.tap(find.byIcon(CupertinoIcons.add));
-    await tester.tap(find.byIcon(CupertinoIcons.add));
+    await tester.tap(icon(AppIcons.plus));
+    await tester.tap(icon(AppIcons.plus));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.text('2'), findsOneWidget);
     expect(find.textContaining('· 200 kcal'), findsOneWidget);
@@ -127,6 +135,73 @@ void main() {
     expect(rows.single.kcal, 200);
     // Back on the list.
     expect(find.text('Done · 200 kcal'), findsOneWidget);
+    await finish(tester);
+  });
+
+  testWidgets('a food can be logged by weight', (tester) async {
+    await pumpHarness(tester);
+    await openSheet(tester);
+
+    // Roti: 1 medium (40 g) = 100 kcal, so 20 g = 50 kcal.
+    await tester.tap(find.text('Roti'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Grams'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.enterText(find.byType(TextField), '20');
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.textContaining('· 50 kcal'), findsOneWidget);
+
+    await tester.ensureVisible(find.textContaining('Add to'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await tester.tap(find.textContaining('Add to'));
+    await settleDb(tester);
+    final rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows!.single.name, 'Roti · 20 g');
+    expect(rows.single.kcal, 50);
+    await finish(tester);
+  });
+
+  testWidgets('an add can be taken back from the row stepper', (tester) async {
+    await pumpHarness(tester);
+    await openSheet(tester);
+
+    await tester.enterText(find.byType(TextField), 'banana');
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    // Add twice: the "+" grows into a "− 2 +" stepper.
+    await tester.tap(find.byType(AddCircle).first);
+    await settleDb(tester);
+    await tester.tap(icon(AppIcons.plus).first);
+    await settleDb(tester);
+    expect(find.text('Done · 210 kcal'), findsOneWidget);
+    var rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows, hasLength(2));
+
+    // "−" deletes the latest entry; at one left it shows a trash icon.
+    await tester.tap(icon(AppIcons.minus).first);
+    await settleDb(tester);
+    rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows, hasLength(1));
+    expect(find.text('Done · 105 kcal'), findsOneWidget);
+
+    await tester.tap(icon(AppIcons.trash).first);
+    await settleDb(tester);
+    rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows, isEmpty);
+    expect(find.textContaining('Done ·'), findsNothing);
+    await finish(tester);
+  });
+
+  testWidgets('swiping left on the list moves to the next chip', (tester) async {
+    await pumpHarness(tester);
+    await openSheet(tester);
+    expect(find.text('Roti'), findsOneWidget); // Popular
+
+    await tester.fling(find.text('Roti'), const Offset(-300, 0), 1500);
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    // Popular -> Meals: preset plates replace the food list.
+    expect(find.text('QUICK MEALS'), findsOneWidget);
     await finish(tester);
   });
 

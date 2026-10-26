@@ -251,12 +251,13 @@ class AppTypography {
         numeralL = _style(40, FontWeight.w800, p.textPrimary, spacing: -1.5, height: 1.05),
         numeralM = _style(24, FontWeight.w800, p.textPrimary, spacing: -0.6, height: 1.1),
         numeralS = _style(17, FontWeight.w700, p.textPrimary, spacing: -0.2, height: 1.15),
-        title = _style(28, FontWeight.w800, p.textPrimary, spacing: -0.8, height: 1.15),
+        title = _style(30, FontWeight.w800, p.textPrimary, spacing: -0.9, height: 1.12),
         heading = _style(19, FontWeight.w700, p.textPrimary, spacing: -0.3, height: 1.25),
         body = _style(15, FontWeight.w500, p.textPrimary, height: 1.35),
         bodyStrong = _style(15, FontWeight.w700, p.textPrimary, height: 1.35),
         label = _style(13, FontWeight.w600, p.textSecondary, height: 1.3),
         caption = _style(12, FontWeight.w600, p.textTertiary, height: 1.3),
+        eyebrow = _style(11, FontWeight.w700, p.textTertiary, spacing: 0.9, height: 1.2),
         button = _style(16, FontWeight.w700, p.onInk, height: 1.2);
 
   final TextStyle numeralXL;
@@ -269,11 +270,15 @@ class AppTypography {
   final TextStyle bodyStrong;
   final TextStyle label;
   final TextStyle caption;
+
+  /// Small all-caps kicker above titles and section labels.
+  final TextStyle eyebrow;
   final TextStyle button;
 
   /// Bundled in assets/fonts (SIL OFL), so it renders offline and in release
   /// builds. Do not switch back to runtime fetching.
   static const String fontFamily = 'PlusJakartaSans';
+
 
   static TextStyle _style(
     double size,
@@ -320,6 +325,7 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      fontFamily: AppTypography.fontFamily,
       colorScheme: scheme,
       scaffoldBackgroundColor: p.background,
       canvasColor: p.background,

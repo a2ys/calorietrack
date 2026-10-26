@@ -7,6 +7,7 @@ import '../../core/db/providers.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_utils.dart';
+import '../../core/utils/haptics.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/entry_tile.dart';
@@ -37,11 +38,20 @@ class HomeScreen extends ConsumerWidget {
 
     if (profile == null) return const SizedBox.shrink();
     final eaten = sumEntries(entries);
-    final greeting = greetingFor(DateTime.now());
-    final name = firstName(prefs.name);
-    final isToday = isSameDay(day, DateTime.now());
+    final now = DateTime.now();
+    final headline = dayHeadline(
+      day: day,
+      now: now,
+      eaten: eaten.kcal,
+      target: profile.calorieTarget,
+      entries: entries.length,
+    );
+    final isToday = isSameDay(day, now);
 
-    return Scaffold(
+    // Own messenger: snackbars raised from Today land in this Scaffold, which
+    // floats them above the + button instead of on top of it.
+    return ScaffoldMessenger(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: _AddButton(
         onTap: () => showAddFoodSheet(context, day: day),
@@ -62,42 +72,73 @@ class HomeScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            PopIn(child: Emoji(greeting.emoji, size: 16)),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(greeting.text, style: t.label),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          name.isEmpty ? 'Welcome back' : name,
-                          style: t.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        AnimatedSwitcher(
-                          duration: AppMotion.fast,
-                          child: Text(
-                            isToday
-                                ? longDateLabel(day)
-                                : '${dayLabel(day)} · ${longDateLabel(day)}',
-                            key: ValueKey(day),
-                            style: t.label.copyWith(
-                              color: isToday ? p.textTertiary : p.textPrimary,
+                    // Re-keyed per day so switching days cross-fades the
+                    // whole block instead of swapping text in place.
+                    child: AnimatedSwitcher(
+                      duration: AppMotion.normal,
+                      switchInCurve: AppMotion.easeOut,
+                      layoutBuilder: (current, previous) => Stack(
+                        alignment: Alignment.topLeft,
+                        children: [...previous, ?current],
+                      ),
+                      child: Column(
+                        key: ValueKey(day),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(headline.eyebrow, style: t.eyebrow),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            headline.title,
+                            style: t.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            headline.line,
+                            style: t.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Looking at another day: one tap back to today.
+                  AnimatedSwitcher(
+                    duration: AppMotion.normal,
+                    transitionBuilder: (c, a) => FadeTransition(
+                      opacity: a,
+                      child: ScaleTransition(scale: Tween<double>(begin: 0.8, end: 1).animate(a), child: c),
+                    ),
+                    child: isToday
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            padding: const EdgeInsets.only(left: AppSpacing.sm),
+                            child: PressScale(
+                              scale: 0.92,
+                              semanticLabel: 'Go to today',
+                              onTap: () {
+                                Haptics.tap();
+                                ref.read(selectedDayProvider.notifier).select(now);
+                              },
+                              child: Container(
+                                height: 36,
+                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(color: p.ink, borderRadius: AppRadii.chip),
+                                child: Text(
+                                  'Today',
+                                  style: t.label.copyWith(color: p.onInk, fontWeight: FontWeight.w700),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   PressScale(
                     scale: 0.92,
+                    semanticLabel: 'Settings',
                     onTap: () => context.go(Routes.settings),
                     child: Container(
                       decoration: BoxDecoration(
@@ -150,7 +191,7 @@ class HomeScreen extends ConsumerWidget {
                 AppSpacing.screen,
                 AppSpacing.md,
               ),
-              child: Text(entries.isEmpty ? 'Meals' : 'Meals · ${entries.length}',
+              child: Text(entries.isEmpty ? 'Food log' : 'Food log · ${entries.length}',
                   style: t.heading),
             ),
             if (entries.isEmpty)
@@ -172,6 +213,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -213,6 +255,7 @@ class _AddButton extends StatelessWidget {
     final p = context.palette;
     return PressScale(
       scale: 0.9,
+      semanticLabel: 'Add food',
       onTap: onTap,
       child: Container(
         width: AppSizes.fab,

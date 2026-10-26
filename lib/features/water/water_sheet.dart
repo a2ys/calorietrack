@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,13 +25,64 @@ Future<void> showWaterSheet(BuildContext context, {required DateTime day}) {
   );
 }
 
-class WaterSheet extends ConsumerWidget {
+class WaterSheet extends ConsumerStatefulWidget {
   const WaterSheet({super.key, required this.day});
 
   final DateTime day;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WaterSheet> createState() => _WaterSheetState();
+}
+
+class _WaterSheetState extends ConsumerState<WaterSheet> {
+  static const _undoWindow = Duration(seconds: 4);
+
+  // Inline undo: snackbars from the underlying scaffold are hidden by the sheet.
+  String? _undoText;
+  VoidCallback? _onUndo;
+  Timer? _undoTimer;
+
+  DateTime get day => widget.day;
+
+  @override
+  void dispose() {
+    _undoTimer?.cancel();
+    super.dispose();
+  }
+
+  void _offerUndo(String text, VoidCallback onUndo) {
+    _undoTimer?.cancel();
+    setState(() {
+      _undoText = text;
+      _onUndo = onUndo;
+    });
+    _undoTimer = Timer(_undoWindow, _hideUndo);
+  }
+
+  void _hideUndo() {
+    _undoTimer?.cancel();
+    if (mounted) setState(() => _undoText = null);
+  }
+
+  Future<void> _add(int ml) async {
+    final db = ref.read(databaseProvider);
+    final id = await logWater(context, ref, day, ml, showUndo: false);
+    if (!mounted) return;
+    _offerUndo('Added ${formatWater(ml)}', () => db.deleteWater(id));
+  }
+
+  void _remove(WaterLog log) {
+    final db = ref.read(databaseProvider);
+    db.deleteWater(log.id);
+    Haptics.medium();
+    _offerUndo(
+      'Removed ${formatWater(log.amountMl)}',
+      () => db.addWater(log.amountMl, log.loggedAt),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final t = context.type;
     final p = context.palette;
     final prefs = readPrefs(ref);
@@ -88,7 +141,7 @@ class WaterSheet extends ConsumerWidget {
                     child: _PresetTile(
                       ml: ml,
                       highlight: ml == prefs.waterGlassMl,
-                      onTap: () => logWater(context, ref, day, ml),
+                      onTap: () => _add(ml),
                     ),
                   ),
               ],
@@ -108,6 +161,21 @@ class WaterSheet extends ConsumerWidget {
           Text(isSameDay(day, DateTime.now()) ? 'TODAY' : dayLabel(day).toUpperCase(),
               style: t.caption.copyWith(letterSpacing: 0.8)),
           const SizedBox(height: AppSpacing.sm),
+          AnimatedSize(
+            duration: AppMotion.normal,
+            curve: AppMotion.easeOut,
+            alignment: Alignment.topCenter,
+            child: _undoText == null
+                ? const SizedBox(width: double.infinity)
+                : _UndoPill(
+                    text: _undoText!,
+                    onUndo: () {
+                      Haptics.tap();
+                      _onUndo?.call();
+                      _hideUndo();
+                    },
+                  ),
+          ),
           if (logs.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
@@ -118,20 +186,7 @@ class WaterSheet extends ConsumerWidget {
               _LogRow(
                 key: ValueKey('water-${log.id}'),
                 log: log,
-                onDelete: () {
-                  db.deleteWater(log.id);
-                  Haptics.medium();
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(SnackBar(
-                      content: Text('Removed ${formatWater(log.amountMl)}'),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        textColor: p.onInk,
-                        onPressed: () => db.addWater(log.amountMl, log.loggedAt),
-                      ),
-                    ));
-                },
+                onDelete: () => _remove(log),
               ),
         ],
       ),
@@ -175,6 +230,41 @@ class _PresetTile extends StatelessWidget {
   }
 }
 
+/// Ink pill with a message and an Undo action, shown above the log list.
+class _UndoPill extends StatelessWidget {
+  const _UndoPill({required this.text, required this.onUndo});
+
+  final String text;
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.type;
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        padding: const EdgeInsets.only(left: AppSpacing.lg, right: AppSpacing.xs),
+        decoration: BoxDecoration(color: p.ink, borderRadius: AppRadii.chip),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: t.body.copyWith(color: p.onInk))),
+            PressScale(
+              onTap: onUndo,
+              child: Container(
+                height: AppSizes.iconTile,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Text('Undo', style: t.bodyStrong.copyWith(color: p.onInk)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LogRow extends StatelessWidget {
   const _LogRow({super.key, required this.log, required this.onDelete});
 
@@ -195,7 +285,8 @@ class _LogRow extends StatelessWidget {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.lg),
-        child: AppIcon(AppIcons.trash, size: 20, color: p.accent),
+        decoration: BoxDecoration(color: p.accent, borderRadius: AppRadii.tile),
+        child: AppIcon(AppIcons.trash, size: 20, color: p.onInk),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -205,6 +296,16 @@ class _LogRow extends StatelessWidget {
             const SizedBox(width: AppSpacing.md),
             Expanded(child: Text(formatWater(log.amountMl), style: t.bodyStrong)),
             Text(timeLabel(log.loggedAt), style: t.label),
+            PressScale(
+              semanticLabel: 'Delete ${formatWater(log.amountMl)}',
+              scale: 0.9,
+              onTap: onDelete,
+              child: SizedBox(
+                width: AppSizes.iconTile,
+                height: AppSizes.iconTile,
+                child: Center(child: AppIcon(AppIcons.trash, size: 18, color: p.textTertiary)),
+              ),
+            ),
           ],
         ),
       ),

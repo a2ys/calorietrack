@@ -94,6 +94,24 @@ class Food {
     );
   }
 
+  /// The same food as one [g]-gram serving ("50 g"), for when you know the
+  /// weight you ate. Needs [grams].
+  Food withGrams(int g) {
+    final k = g / grams!;
+    return Food(
+      name: name,
+      emoji: emoji,
+      group: group,
+      serving: '$g g',
+      grams: g,
+      kcal: (kcal * k).round(),
+      protein: _round1(protein * k),
+      carbs: _round1(carbs * k),
+      fat: _round1(fat * k),
+      curated: curated,
+    );
+  }
+
   MealItem toMealItem(double qty) => MealItem(
         name: name,
         emoji: emoji,

@@ -116,6 +116,7 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
   }
 
   Future<void> _saveCopy() async {
+    final messenger = ScaffoldMessenger.of(context);
     await ref.read(databaseProvider).addSavedMeal(
           name: widget.name,
           emoji: widget.emoji,
@@ -124,6 +125,9 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
     Haptics.success();
     if (!mounted) return;
     Navigator.of(context).pop(false);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(const SnackBar(content: Text('Saved to My meals')));
   }
 
   void _edit() {
@@ -207,7 +211,7 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
                           children: [
                             Emoji(kind.emoji, size: 18),
                             const SizedBox(height: AppSpacing.xxs),
-                            Text('${grams.round()} g', style: t.numeralS),
+                            Text('${grams.round()}g', style: t.numeralS),
                             Text(kind.label, style: t.caption),
                           ],
                         ),
@@ -293,7 +297,7 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: AppButton(label: 'Delete', icon: AppIcons.trash, style: AppButtonStyle.outline, onPressed: _delete),
+                  child: AppButton(label: 'Delete', icon: AppIcons.trash, style: AppButtonStyle.danger, onPressed: _delete),
                 ),
               ],
             )

@@ -7,12 +7,14 @@ import '../../core/db/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/count_up_text.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/entry_tile.dart';
 import '../../core/widgets/macro_icons.dart';
 import '../../core/widgets/press_scale.dart';
+import '../add_food/add_food_sheet.dart';
 import 'week_bar_chart.dart';
 import '../../core/widgets/app_icon.dart';
 
@@ -111,6 +113,13 @@ class HistoryScreen extends ConsumerWidget {
                   const PopIn(child: Emoji('🍽️', size: 40)),
                   const SizedBox(height: AppSpacing.sm),
                   Text('Nothing logged this day', style: t.label),
+                  const SizedBox(height: AppSpacing.lg),
+                  AppButton(
+                    label: 'Add food',
+                    icon: AppIcons.plus,
+                    style: AppButtonStyle.outline,
+                    onPressed: () => showAddFoodSheet(context, day: selected),
+                  ),
                 ],
               ),
             )
@@ -143,13 +152,19 @@ class _WeekStats extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(child: _Stat(label: 'Daily average', value: avg, suffix: ' kcal')),
+        Expanded(
+          child: _Stat(
+            label: 'Daily average',
+            value: logged.isEmpty ? null : avg,
+            unit: 'kcal',
+          ),
+        ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _Stat(
             label: 'Days within goal',
-            value: onTrack,
-            suffix: ' / ${logged.length}',
+            value: logged.isEmpty ? null : onTrack,
+            unit: '/ ${logged.length}',
           ),
         ),
       ],
@@ -158,15 +173,18 @@ class _WeekStats extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value, required this.suffix});
+  const _Stat({required this.label, required this.value, required this.unit});
 
   final String label;
-  final int value;
-  final String suffix;
+
+  /// Null for an empty week: shows a dash instead of a misleading zero.
+  final int? value;
+  final String unit;
 
   @override
   Widget build(BuildContext context) {
     final t = context.type;
+    final p = context.palette;
     return AppCard(
       shadow: false,
       radius: AppRadii.tile,
@@ -175,7 +193,18 @@ class _Stat extends StatelessWidget {
         children: [
           Text(label, style: t.label),
           const SizedBox(height: AppSpacing.xs),
-          CountUpText(value: value, suffix: suffix, style: t.numeralM),
+          if (value == null)
+            Text('–', style: t.numeralM.copyWith(color: p.textSecondary))
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                CountUpText(value: value!, style: t.numeralM),
+                const SizedBox(width: AppSpacing.xs),
+                Text(unit, style: t.label),
+              ],
+            ),
         ],
       ),
     );

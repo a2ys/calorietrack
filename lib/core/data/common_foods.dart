@@ -23,9 +23,17 @@ Food _f(
       protein: p,
       carbs: c,
       fat: f,
+      grams: _gramsIn(serving),
       aliases: aliases,
       curated: true,
     );
+
+/// The weight a serving label states, so it can be logged by grams:
+/// "1 medium (40 g)" -> 40, "100 g" -> 100, "1 bowl" -> null.
+int? _gramsIn(String serving) {
+  final m = RegExp(r'(\d+(?:\.\d+)?)\s*g\b').firstMatch(serving);
+  return m == null ? null : double.parse(m.group(1)!).round();
+}
 
 const _in = FoodGroup.indian;
 const _gr = FoodGroup.grains;

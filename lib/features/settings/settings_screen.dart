@@ -152,7 +152,7 @@ class SettingsScreen extends ConsumerWidget {
             _Row(
               emoji: AppEmoji.water,
               title: 'Daily goal',
-              subtitle: 'Per day',
+              subtitle: 'About ${(prefs.waterGoalMl / prefs.waterGlassMl).round()} glasses of ${formatWater(prefs.waterGlassMl)}',
               trailing: WaterGoalStepper(
                 goalMl: prefs.waterGoalMl,
                 onChanged: (v) => db.setPref(PrefKeys.waterGoal, '$v'),
@@ -262,6 +262,7 @@ class SettingsScreen extends ConsumerWidget {
           Text(
             'Everything is stored on this device only. No account, no cloud.',
             style: t.caption,
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.xxl),
           Row(
@@ -273,8 +274,10 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xxs),
-          Center(
-            child: Text('Emoji: Twemoji (CC-BY 4.0) · Font: Plus Jakarta Sans (OFL)', style: t.caption),
+          Text(
+            'Emoji: Twemoji (CC-BY 4.0) · Font: Plus Jakarta Sans (OFL)',
+            style: t.caption,
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -404,11 +407,14 @@ class _Switch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // The off thumb must stand out from the track in both themes.
+    final light = Theme.of(context).brightness == Brightness.light;
     return CupertinoSwitch(
       value: value,
       activeTrackColor: p.ink,
       inactiveTrackColor: p.track,
       thumbColor: p.surface,
+      inactiveThumbColor: light ? Colors.white : p.textSecondary,
       onChanged: (v) {
         Haptics.tap();
         onChanged(v);
@@ -689,7 +695,22 @@ class _BodySheetState extends ConsumerState<_BodySheet> {
   late double _weightKg = widget.profile.weightKg;
   late ActivityLevel _activity = widget.profile.activity;
 
+  bool get _unchanged {
+    final p = widget.profile;
+    return _goal == p.goal &&
+        _sex == p.sex &&
+        _age == p.age &&
+        _heightCm == p.heightCm &&
+        _weightKg == p.weightKg &&
+        _activity == p.activity;
+  }
+
   Future<void> _save() async {
+    // Nothing changed: keep any hand-tuned targets instead of recalculating.
+    if (_unchanged) {
+      Navigator.of(context).pop();
+      return;
+    }
     final t = CalorieCalculator.targets(
       goal: _goal,
       sex: _sex,
