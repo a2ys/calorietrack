@@ -89,6 +89,20 @@ void main() {
     });
   });
 
+  test('the server switch says why photos are off, and offline counts as on', () async {
+    Future<String?> reason(Future<http.Response> Function() reply) =>
+        PhotoMealService.offReason(client: MockClient((_) => reply()));
+
+    expect(await reason(() async => http.Response('{"enabled":true}', 200)), isNull);
+    expect(
+      await reason(() async => http.Response(jsonEncode({'enabled': false, 'message': 'Out of tokens, lol.'}), 200)),
+      'Out of tokens, lol.',
+    );
+    expect(await reason(() async => http.Response('{"enabled":false}', 200)), isNotEmpty);
+    expect(await reason(() async => throw http.ClientException('offline')), isNull);
+    expect(await reason(() async => http.Response('oops', 500)), isNull);
+  });
+
   test('media type follows the bytes', () {
     expect(PhotoMealService.mediaTypeOf(jpeg), 'image/jpeg');
     expect(PhotoMealService.mediaTypeOf(Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0, 0])), 'image/png');

@@ -4,6 +4,11 @@
 // asks Claude to identify the meal, and returns structured nutrition JSON.
 // The key never ships inside the APK.
 //
+// GET /status
+//   200:     { "enabled": boolean, "message"?: "<why it's off>" }
+//   The app asks before opening the camera, so a switched-off feature costs
+//   nothing. Toggle with PHOTO_ENABLED in wrangler.toml, then `npm run deploy`.
+//
 // POST /analyze
 //   headers: Authorization: Bearer <APP_TOKEN>, X-Install-Id: <random id per install>
 //   body:    { "image": "<base64>", "mediaType"?: "image/jpeg", "localTime": "13:05", "note"?: "what the last answer got wrong" }
@@ -17,7 +22,12 @@ export interface Env {
   /** Shared secret the app sends. Not a strong secret (it lives in the APK), but it keeps casual traffic out and can be rotated. */
   APP_TOKEN: string;
   LIMITER: RateLimit;
+  /** "true" turns photo logging on for every install; anything else shows OFF_MESSAGE. */
+  PHOTO_ENABLED?: string;
 }
+
+const OFF_MESSAGE =
+  "Not enough money for AI tokens right now, lol. Photo logging will be back soon. Barcode scanning still works!";
 
 const MODEL = "claude-opus-5-5";
 
@@ -75,12 +85,18 @@ function fail(status: number, error: string, message: string): Response {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const enabled = env.PHOTO_ENABLED === "true";
+    if (request.method === "GET" && url.pathname === "/status") {
+      return json(enabled ? { enabled } : { enabled, message: OFF_MESSAGE });
+    }
     if (request.method !== "POST" || url.pathname !== "/analyze") {
-      return fail(404, "not_found", "Use POST /analyze.");
+      return fail(404, "not_found", "Use GET /status or POST /analyze.");
     }
     if (request.headers.get("authorization") !== `Bearer ${env.APP_TOKEN}`) {
       return fail(401, "unauthorized", "Missing or wrong app token.");
     }
+
+    if (!enabled) return fail(503, "off", OFF_MESSAGE);
 
     const installId = request.headers.get("x-install-id") ?? "anonymous";
     const { success } = await env.LIMITER.limit({ key: installId });
@@ -151,7 +167,7 @@ export default {
       if (error instanceof Anthropic.BadRequestError) {
         // An empty prepaid balance also comes back as a 400; the message is the only way to tell.
         if (/credit balance/i.test(error.message)) {
-          return fail(503, "no_credit", "Photo logging is out of API credit. Add credit in the Anthropic console.");
+          return fail(503, "no_credit", OFF_MESSAGE);
         }
         return fail(400, "bad_image", "That photo couldn't be read. Try another one.");
       }

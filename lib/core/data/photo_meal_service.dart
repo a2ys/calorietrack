@@ -59,6 +59,25 @@ class PhotoMealService {
 
   static bool get isConfigured => _url.isNotEmpty && _token.isNotEmpty;
 
+  /// Why photo logging is switched off on the server right now (it can be
+  /// paused there, e.g. out of API credit), or null when it's on. Asked
+  /// before the camera opens so nobody takes a photo for nothing. Offline
+  /// counts as on: the upload then explains the problem itself.
+  static Future<String?> offReason({http.Client? client}) async {
+    final c = client ?? http.Client();
+    try {
+      final res = await c.get(Uri.parse('$_url/status')).timeout(const Duration(seconds: 5));
+      final body = jsonDecode(utf8.decode(res.bodyBytes));
+      if (res.statusCode != 200 || body is! Map<String, dynamic> || body['enabled'] != false) return null;
+      final message = body['message'];
+      return message is String && message.isNotEmpty ? message : 'Photo logging is paused for now.';
+    } on Exception {
+      return null;
+    } finally {
+      if (client == null) c.close();
+    }
+  }
+
   /// Random per install, for the proxy's per-install rate limit.
   final String installId;
   final http.Client _client;

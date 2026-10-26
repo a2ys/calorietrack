@@ -9,12 +9,21 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_icon.dart';
+import '../../core/widgets/emoji.dart';
 import '../../core/widgets/sheet_scaffold.dart';
 import '../meals/meal_detail_sheet.dart';
 
 /// Takes or picks a photo of a meal, reads it and opens it ready to log.
 /// Completes with `true` if a meal was logged.
 Future<bool> logMealFromPhoto(BuildContext context, AppDatabase db, {DateTime? day}) async {
+  final off = await PhotoMealService.offReason();
+  if (!context.mounted) return false;
+  if (off != null) {
+    Haptics.warning();
+    await showAppSheet<void>(context, initialSize: 0.36, builder: (_) => _OffSheet(message: off));
+    return false;
+  }
+
   final source = await showAppSheet<ImageSource>(
     context,
     initialSize: 0.36,
@@ -41,6 +50,30 @@ Future<bool> logMealFromPhoto(BuildContext context, AppDatabase db, {DateTime? d
     builder: (_) => PhotoMealSheet(photo: photo, service: service, day: day),
   );
   return logged == true;
+}
+
+/// Photo logging is switched off on the server.
+class _OffSheet extends StatelessWidget {
+  const _OffSheet({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.type;
+    final p = context.palette;
+    return SheetScaffold(
+      title: 'Photo logging is on a break',
+      trailing: const PopIn(child: EmojiTile('💸', size: 52, radius: 16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(message, style: t.body.copyWith(color: p.textSecondary)),
+          const SizedBox(height: AppSpacing.xl),
+          AppButton(label: 'Got it', onPressed: () => Navigator.of(context).pop()),
+        ],
+      ),
+    );
+  }
 }
 
 class _SourceSheet extends StatelessWidget {

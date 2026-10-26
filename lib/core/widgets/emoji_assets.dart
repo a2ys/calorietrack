@@ -69,6 +69,7 @@ const Set<String> kEmojiAssetKeys = {
   '1f440',
   '1f4a7',
   '1f4aa',
+  '1f4b8',
   '1f4cf',
   '1f4dc',
   '1f4f1',
