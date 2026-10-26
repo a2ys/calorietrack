@@ -422,11 +422,20 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
   void _onSwipeStart(DragStartDetails _) {
     _swipe.stop();
     _rawShift = _shift.value;
+    _travel = 0;
   }
+
+  /// Finger travel this drag, before the slop is taken off.
+  double _travel = 0;
 
   void _onSwipeUpdate(DragUpdateDetails d, List<_Chip> chips) {
     if (_query.isNotEmpty) return;
-    _rawShift += d.delta.dx;
+    _travel += d.delta.dx;
+    // Small sideways drift (a slightly diagonal scroll) doesn't move the
+    // list; past the slop it follows the finger without a jump.
+    final over = _travel.abs() - AppGestures.slop;
+    if (over <= 0) return;
+    _rawShift += over < d.delta.dx.abs() ? over * d.delta.dx.sign : d.delta.dx;
     final i = chips.indexOf(_chip!);
     // Past the first or last chip there is nowhere to go: resist instead.
     final atEdge = (_rawShift > 0 && i == 0) || (_rawShift < 0 && i == chips.length - 1);
@@ -445,10 +454,12 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
     // Project where the flick is heading (Apple's decay), not where it let go.
     final projected = _shift.value + (v / 1000) * 0.99 / (1 - 0.99);
     final i = chips.indexOf(_chip!);
+    final committed = _shift.value.abs() >= AppGestures.minTravel &&
+        projected.abs() > width * AppGestures.commitShare;
     _rawShift = 0;
-    if (projected < -width * 0.3 && i < chips.length - 1) {
+    if (committed && projected < 0 && i < chips.length - 1) {
       _selectChip(chips, chips[i + 1], velocity: v);
-    } else if (projected > width * 0.3 && i > 0) {
+    } else if (committed && projected > 0 && i > 0) {
       _selectChip(chips, chips[i - 1], velocity: v);
     } else {
       _settle(from: _shift.value, velocity: v);
@@ -1723,7 +1734,25 @@ class _CustomFormState extends State<_CustomForm> {
     return fromMacros > 0 ? fromMacros : null;
   }
 
-  bool get _valid => _name.text.trim().isNotEmpty && _resolvedKcal != null;
+  /// A macro field's value, or null when left blank (blank isn't zero).
+  static double? _maybe(TextEditingController c) =>
+      c.text.trim().isEmpty ? null : double.tryParse(c.text.trim().replaceAll(',', '.'));
+
+  /// Calories the macros imply when the typed calories disagree with them.
+  int? get _mismatch {
+    final typed = int.tryParse(_kcal.text.trim());
+    if (typed == null) return null; // derived from macros, so consistent
+    return CalorieCalculator.macroMismatch(
+      kcal: typed,
+      proteinG: _maybe(_protein),
+      carbsG: _maybe(_carbs),
+      fatG: _maybe(_fat),
+    );
+  }
+
+  bool get _valid => _name.text.trim().isNotEmpty && _resolvedKcal != null && _mismatch == null;
+
+  bool get _macrosComplete => [_protein, _carbs, _fat].every((c) => c.text.trim().isNotEmpty);
 
   @override
   void initState() {
@@ -1803,6 +1832,25 @@ class _CustomFormState extends State<_CustomForm> {
               Expanded(child: _MacroField(kind: MacroKind.fat, controller: _fat, formatters: numeric)),
             ],
           ),
+          // Inline, as you type: why Add is disabled, and a one-tap fix.
+          AnimatedSize(
+            duration: AppMotion.normal,
+            curve: AppMotion.springSoft,
+            alignment: Alignment.topCenter,
+            child: _mismatch == null
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.md),
+                    child: _MacroMismatch(
+                      implied: _mismatch!,
+                      complete: _macrosComplete,
+                      onUse: () {
+                        Haptics.tap();
+                        _kcal.text = '${_mismatch!}';
+                      },
+                    ),
+                  ),
+          ),
           if (widget.allowSave) ...[
             const SizedBox(height: AppSpacing.md),
             PressScale(
@@ -1845,6 +1893,53 @@ class _CustomFormState extends State<_CustomForm> {
               onPressed: _busy ? null : widget.onDelete,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroMismatch extends StatelessWidget {
+  const _MacroMismatch({required this.implied, required this.complete, required this.onUse});
+
+  final int implied;
+  final bool complete;
+  final VoidCallback onUse;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final t = context.type;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.sm, AppSpacing.md),
+      decoration: BoxDecoration(
+        color: p.accent.withValues(alpha: 0.1),
+        borderRadius: AppRadii.tile,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              complete
+                  ? 'These macros add up to $implied kcal, so the calories don’t match.'
+                  : 'These macros alone are $implied kcal. Calories can’t be lower.',
+              style: t.label.copyWith(color: p.textPrimary),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          PressScale(
+            onTap: onUse,
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: p.ink, borderRadius: AppRadii.chip),
+              child: Text(
+                'Use $implied',
+                style: t.label.copyWith(color: p.onInk, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -153,4 +153,33 @@ abstract final class CalorieCalculator {
               carbsG * kcalPerGramCarbs +
               fatG * kcalPerGramFat)
           .round();
+
+  /// Slack for label rounding when checking calories against macros.
+  static int macroTolerance(int kcal) => kcal * 0.1 > 15 ? (kcal * 0.1).round() : 15;
+
+  /// Checks typed calories against typed macros (null = not entered).
+  /// Returns null when consistent, otherwise the calories the macros imply.
+  ///
+  /// With all three macros the totals must agree. With only some, calories
+  /// just can't be lower than what those macros alone supply. With none
+  /// there is nothing to check.
+  static int? macroMismatch({
+    required int kcal,
+    num? proteinG,
+    num? carbsG,
+    num? fatG,
+  }) {
+    final given = [proteinG, carbsG, fatG].whereType<num>();
+    if (given.isEmpty) return null;
+    final implied = caloriesFromMacros(
+      proteinG: proteinG ?? 0,
+      carbsG: carbsG ?? 0,
+      fatG: fatG ?? 0,
+    );
+    final slack = macroTolerance(implied);
+    final complete = given.length == 3;
+    if (kcal < implied - slack) return implied;
+    if (complete && kcal > implied + slack) return implied;
+    return null;
+  }
 }

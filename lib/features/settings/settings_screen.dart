@@ -11,6 +11,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/calorie_calculator.dart';
 import '../../core/utils/greeting.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/sounds.dart';
 import '../../core/utils/units.dart';
 import '../../core/utils/water.dart';
 import '../../core/widgets/app_button.dart';
@@ -26,6 +27,7 @@ import '../../core/widgets/staggered_entrance.dart';
 import '../../core/widgets/target_editor.dart';
 import '../water/water_widgets.dart';
 import '../../core/widgets/app_icon.dart';
+import 'licenses_sheet.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -209,6 +211,20 @@ class SettingsScreen extends ConsumerWidget {
                 onSaved: (v) => db.setPref(PrefKeys.hapticLevel, '$v'),
               ),
             ),
+            _Row(
+              emoji: '🔊',
+              title: 'Sounds',
+              subtitle: 'Muted in silent mode',
+              trailing: _Switch(
+                value: prefs.sounds,
+                onChanged: (v) {
+                  Sounds.enabled = v;
+                  // Turning sounds on plays one, so you hear what you chose.
+                  if (v) Sounds.play(Sfx.success);
+                  db.setPref(PrefKeys.sounds, v ? '1' : '0');
+                },
+              ),
+            ),
           ]),
 
           // ------------------------------------------------------ units
@@ -235,6 +251,18 @@ class SettingsScreen extends ConsumerWidget {
                 selected: prefs.heightUnit,
                 onChanged: (u) => db.setPref(PrefKeys.heightUnit, u.name),
               ),
+            ),
+          ]),
+
+          // ------------------------------------------------------ about
+          const _SectionLabel('About'),
+          _Group(children: [
+            _Row(
+              emoji: '📜',
+              title: 'Open-source licenses',
+              subtitle: 'Icons, emoji, font, sounds, food data',
+              chevron: true,
+              onTap: () => showLicensesSheet(context),
             ),
           ]),
 
@@ -272,12 +300,6 @@ class SettingsScreen extends ConsumerWidget {
               const Emoji(AppEmoji.fat, size: 13),
               Text(' for eating well', style: t.caption),
             ],
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            'Emoji: Twemoji (CC-BY 4.0) · Font: Plus Jakarta Sans (OFL)',
-            style: t.caption,
-            textAlign: TextAlign.center,
           ),
         ],
       ),

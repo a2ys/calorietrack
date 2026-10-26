@@ -9,6 +9,7 @@ import '../../core/db/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/app_button.dart';
+import '../../core/widgets/confirm_dialog.dart';
 import '../../core/widgets/count_up_text.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/macro_icons.dart';
@@ -34,6 +35,41 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
   bool _saving = false;
 
   bool get _editing => widget.meal != null;
+
+  /// Anything the user would lose by leaving now.
+  bool get _dirty {
+    final m = widget.meal;
+    if (m == null) return _name.text.trim().isNotEmpty || _items.isNotEmpty;
+    return _name.text.trim() != m.name ||
+        _emoji != m.emoji ||
+        _items.length != m.items.length ||
+        Iterable.generate(_items.length)
+            .any((i) => _items[i].name != m.items[i].name || _items[i].qty != m.items[i].qty);
+  }
+
+  /// Back button, edge swipe or the close button: ask before throwing work
+  /// away, never on a clean screen.
+  Future<void> _leave() async {
+    if (_dirty && !_saving) {
+      final discard = await showAppDialog<bool>(
+        context,
+        builder: (_) => ConfirmDialog(
+          title: _editing ? 'Discard changes?' : 'Discard this meal?',
+          message: _editing ? 'Your edits to this meal won’t be saved.' : 'What you’ve added so far won’t be saved.',
+          confirmLabel: 'Discard',
+        ),
+      );
+      if (discard != true) return;
+    }
+    if (!mounted) return;
+    // Rebuild with canPop: true first, or PopScope would block this pop too.
+    setState(() => _leaving = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.pop();
+    });
+  }
+
+  bool _leaving = false;
   bool get _valid => _name.text.trim().isNotEmpty && _items.isNotEmpty;
 
   @override
@@ -128,7 +164,12 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
     final total = sumMealItems(_items);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_dirty || _saving || _leaving,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -145,7 +186,8 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
                 child: Row(
                   children: [
                     PressScale(
-                      onTap: () => context.pop(),
+                      semanticLabel: 'Close',
+                      onTap: _leave,
                       child: Container(
                         width: AppSizes.iconTile,
                         height: AppSizes.iconTile,
@@ -310,6 +352,7 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -369,6 +412,7 @@ class _IngredientRow extends StatelessWidget {
     return Dismissible(
       key: ValueKey('dismiss-${item.name}-${item.serving}'),
       direction: DismissDirection.endToStart,
+      dismissThresholds: const {DismissDirection.endToStart: AppGestures.deleteThreshold},
       onUpdate: (d) {
         if (d.reached && !d.previousReached) Haptics.light();
       },

@@ -28,14 +28,10 @@ abstract final class AppIcons {
   static const bookmark = AppIconData('bold-bookmark-simple');
   static const clearFill = AppIconData('fill-x-circle');
 
-  // Tabs: outline when idle, filled when active.
-  static const house = AppIconData('regular-house');
+  // Tabs: solid in both states; colour marks the active one.
   static const houseFill = AppIconData('fill-house');
-  static const forkKnife = AppIconData('regular-fork-knife');
   static const forkKnifeFill = AppIconData('fill-fork-knife');
-  static const chartBar = AppIconData('regular-chart-bar');
   static const chartBarFill = AppIconData('fill-chart-bar');
-  static const gear = AppIconData('regular-gear-six');
   static const gearFill = AppIconData('fill-gear-six');
 }
 

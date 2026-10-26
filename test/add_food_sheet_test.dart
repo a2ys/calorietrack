@@ -205,6 +205,51 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('a short sideways twitch does not change the chip', (tester) async {
+    await pumpHarness(tester);
+    await openSheet(tester);
+
+    // Fast but tiny: inside the slop + minimum travel, so still Popular.
+    await tester.fling(find.text('Roti'), const Offset(-40, 0), 2000);
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.text('Roti'), findsOneWidget);
+    expect(find.text('QUICK MEALS'), findsNothing);
+    await finish(tester);
+  });
+
+  testWidgets('custom food is blocked until calories match its macros', (tester) async {
+    await pumpHarness(tester);
+    await openSheet(tester);
+    await tester.tap(find.text('Custom food'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'Protein bar');
+    await tester.enterText(fields.at(1), '500');
+    await tester.enterText(fields.at(2), '20');
+    await tester.enterText(fields.at(3), '30');
+    await tester.enterText(fields.at(4), '10');
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+    // 20/30/10 g = 290 kcal, not 500: explained inline, Add disabled.
+    expect(find.textContaining('add up to 290 kcal'), findsOneWidget);
+    await tester.tap(find.textContaining('Add to'));
+    await settleDb(tester);
+    var rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows, isEmpty);
+
+    // One tap takes the macros' number, and it can be added.
+    await tester.tap(find.text('Use 290'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.textContaining('add up to'), findsNothing);
+    await tester.ensureVisible(find.textContaining('Add to'));
+    await tester.tap(find.textContaining('Add to'));
+    await settleDb(tester);
+    rows = await tester.runAsync(() => db.select(db.foodEntries).get());
+    expect(rows!.single.kcal, 290);
+    await finish(tester);
+  });
+
   testWidgets('dragging the sheet down dismisses it', (tester) async {
     await pumpHarness(tester);
     await openSheet(tester);

@@ -1,6 +1,12 @@
 import 'package:flutter/services.dart';
 
+import 'sounds.dart';
+
 /// Thin wrapper so haptics can be tuned in one place.
+///
+/// Every event also plays its sound cue ([Sounds]), so new UI that uses
+/// Haptics gets matching sound with no extra work. Sound follows its own
+/// on/off setting, not the haptic strength.
 ///
 /// Flutter can only ask the OS for a few fixed feedback types, so "strength" is
 /// a ladder of them. Every haptic in the app has a base rung; the user's
@@ -56,19 +62,34 @@ abstract final class Haptics {
   }
 
   /// Selection tick: segmented controls, wheels, steppers.
-  static void tap() => _play(0);
+  static void tap() {
+    Sounds.play(Sfx.tick);
+    _play(0);
+  }
 
   /// Opening something: sheets, dialogs, the + button.
-  static void light() => _play(1);
+  static void light() {
+    Sounds.play(Sfx.open);
+    _play(1);
+  }
 
-  static void medium() => _play(2);
+  /// Removing something.
+  static void medium() {
+    Sounds.play(Sfx.thunk);
+    _play(2);
+  }
 
   /// A thing was saved or logged: a firm tap followed by a soft one.
-  static void success() {
+  /// [sound] lets a moment use its own cue (water plays a drop).
+  static void success([Sfx sound = Sfx.success]) {
+    Sounds.play(sound);
     if (!enabled) return;
     _play(2);
     Future<void>.delayed(const Duration(milliseconds: 90), () => _play(0));
   }
 
-  static void warning() => _play(3);
+  static void warning() {
+    Sounds.play(Sfx.warning);
+    _play(3);
+  }
 }

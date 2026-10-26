@@ -101,4 +101,27 @@ void main() {
       expect(Units.formatHeight(175, HeightUnit.ft), '5′ 9″');
     });
   });
+
+  group('macroMismatch', () {
+    int? check(int kcal, {num? p, num? c, num? f}) =>
+        CalorieCalculator.macroMismatch(kcal: kcal, proteinG: p, carbsG: c, fatG: f);
+
+    test('no macros: nothing to check', () {
+      expect(check(500), isNull);
+    });
+
+    test('all three macros must add up, within rounding', () {
+      // 20*4 + 30*4 + 10*9 = 290
+      expect(check(290, p: 20, c: 30, f: 10), isNull);
+      expect(check(300, p: 20, c: 30, f: 10), isNull); // within 10% / 15 kcal
+      expect(check(500, p: 20, c: 30, f: 10), 290);
+      expect(check(150, p: 20, c: 30, f: 10), 290);
+    });
+
+    test('some macros: calories only need to cover them', () {
+      // 30 g protein = 120 kcal minimum
+      expect(check(400, p: 30), isNull);
+      expect(check(60, p: 30), 120);
+    });
+  });
 }

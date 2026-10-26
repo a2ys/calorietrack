@@ -7,6 +7,7 @@ import 'core/db/database.dart';
 import 'core/db/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/haptics.dart';
+import 'core/utils/sounds.dart';
 
 class CalorieApp extends ConsumerWidget {
   const CalorieApp({super.key, required this.router});
@@ -20,6 +21,7 @@ class CalorieApp extends ConsumerWidget {
 
     final prefs = ref.watch(prefsProvider).value ?? const AppPrefs();
     Haptics.level = prefs.hapticLevel;
+    Sounds.enabled = prefs.sounds;
 
     // Light unless the user picked otherwise.
     final mode = switch (prefs.themeMode) {

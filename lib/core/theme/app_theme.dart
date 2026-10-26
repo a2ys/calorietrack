@@ -123,6 +123,28 @@ abstract final class AppMotion {
   static const double pressScale = 0.97;
 }
 
+// --------------------------------------------------------------- gestures
+
+/// Guards against accidental swipes. Destructive swipes need a deliberate
+/// pull; navigation swipes ignore small drifts from a vertical scroll.
+abstract final class AppGestures {
+  /// Share of the row width a swipe-to-delete must travel (with undo after).
+  static const double deleteThreshold = 0.5;
+
+  /// Share for non-destructive swipes (e.g. swipe to edit).
+  static const double actionThreshold = 0.35;
+
+  /// Horizontal travel ignored before a page swipe starts following the finger.
+  static const double slop = 14;
+
+  /// A page swipe only commits after this much real travel, however fast:
+  /// a quick twitch is not a decision.
+  static const double minTravel = 48;
+
+  /// ...and when it is heading past this share of the width.
+  static const double commitShare = 0.3;
+}
+
 // ----------------------------------------------------------------- colour
 
 @immutable

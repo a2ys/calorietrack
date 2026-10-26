@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/db/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/sounds.dart';
 import '../../core/utils/water.dart';
 
 /// Logs [ml] of water on [day] (at the current time of day) and returns the new
@@ -23,7 +24,7 @@ Future<int> logWater(
     ml,
     DateTime(day.year, day.month, day.day, now.hour, now.minute, now.second),
   );
-  Haptics.success();
+  Haptics.success(Sfx.water);
   if (!showUndo || !context.mounted) return id;
   ScaffoldMessenger.of(context)
     ..clearSnackBars()

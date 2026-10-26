@@ -19,8 +19,6 @@ class EntryTile extends ConsumerWidget {
 
   final FoodEntry entry;
 
-  static const double _swipeThreshold = 0.35;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = context.palette;
@@ -44,8 +42,8 @@ class EntryTile extends ConsumerWidget {
       background: swipeBackground(edit: true),
       secondaryBackground: swipeBackground(edit: false),
       dismissThresholds: const {
-        DismissDirection.startToEnd: _swipeThreshold,
-        DismissDirection.endToStart: _swipeThreshold,
+        DismissDirection.startToEnd: AppGestures.actionThreshold,
+        DismissDirection.endToStart: AppGestures.deleteThreshold,
       },
       onUpdate: (d) {
         if (d.reached && !d.previousReached) Haptics.light();

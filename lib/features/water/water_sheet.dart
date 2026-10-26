@@ -278,6 +278,7 @@ class _LogRow extends StatelessWidget {
     return Dismissible(
       key: ValueKey('dismiss-water-${log.id}'),
       direction: DismissDirection.endToStart,
+      dismissThresholds: const {DismissDirection.endToStart: AppGestures.deleteThreshold},
       onUpdate: (d) {
         if (d.reached && !d.previousReached) Haptics.light();
       },

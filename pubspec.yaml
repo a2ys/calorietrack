@@ -40,6 +40,7 @@ dependencies:
   drift_flutter: ^0.3.1
   intl: ^0.20.3
   flutter_svg: ^2.3.0
+  audioplayers: ^6.8.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -80,6 +81,7 @@ flutter:
     - assets/data/usda_foods.json
     - assets/emoji/
     - assets/icons/
+    - assets/sfx/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

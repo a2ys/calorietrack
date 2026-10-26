@@ -17,10 +17,10 @@ class AppShell extends ConsumerWidget {
   final StatefulNavigationShell shell;
 
   static const _items = [
-    (AppIcons.houseFill, AppIcons.house, 'Today'),
-    (AppIcons.forkKnifeFill, AppIcons.forkKnife, 'Meals'),
-    (AppIcons.chartBarFill, AppIcons.chartBar, 'Progress'),
-    (AppIcons.gearFill, AppIcons.gear, 'Settings'),
+    (AppIcons.houseFill, 'Today'),
+    (AppIcons.forkKnifeFill, 'Meals'),
+    (AppIcons.chartBarFill, 'Progress'),
+    (AppIcons.gearFill, 'Settings'),
   ];
 
   @override
@@ -55,8 +55,7 @@ class AppShell extends ConsumerWidget {
                       },
                       child: _TabItem(
                         icon: _items[i].$1,
-                        outlineIcon: _items[i].$2,
-                        label: _items[i].$3,
+                        label: _items[i].$2,
                         selected: i == shell.currentIndex,
                         color: i == shell.currentIndex ? p.textPrimary : p.textTertiary,
                         style: t.caption,
@@ -75,15 +74,15 @@ class AppShell extends ConsumerWidget {
 class _TabItem extends StatelessWidget {
   const _TabItem({
     required this.icon,
-    required this.outlineIcon,
     required this.label,
     required this.selected,
     required this.color,
     required this.style,
   });
 
+  /// Solid in both states, like Uber's tab bar: only the colour changes, so
+  /// the four glyphs always read as one family.
   final AppIconData icon;
-  final AppIconData outlineIcon;
   final String label;
   final bool selected;
   final Color color;
@@ -101,7 +100,7 @@ class _TabItem extends StatelessWidget {
           duration: AppMotion.springDuration,
           curve: AppMotion.springBouncy,
           builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-          child: AppIcon(selected ? icon : outlineIcon, size: 24, color: color),
+          child: AppIcon(icon, size: 24, color: color),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(label, style: style.copyWith(color: color)),

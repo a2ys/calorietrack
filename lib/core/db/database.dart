@@ -321,6 +321,7 @@ abstract final class PrefKeys {
   static const waterGoal = 'water_goal_ml';
   static const waterGlass = 'water_glass_ml';
   static const calorieView = 'calorie_view';
+  static const sounds = 'sounds';
 }
 
 /// How the big number on Today reads.
@@ -345,6 +346,7 @@ class AppPrefs {
     this.waterGoalMl = defaultWaterGoalMl,
     this.waterGlassMl = defaultWaterGlassMl,
     this.calorieView = CalorieView.left,
+    this.sounds = true,
   });
 
   static const defaultAvatar = '🥑';
@@ -366,6 +368,9 @@ class AppPrefs {
   final int waterGlassMl;
   final CalorieView calorieView;
 
+  /// UI sound effects. On by default; they follow the phone's silent mode.
+  final bool sounds;
+
   /// The saved level, else the old on/off switch (off -> 0), else the default.
   static int _parseHapticLevel(Map<String, String> m) {
     final saved = int.tryParse(m[PrefKeys.hapticLevel] ?? '');
@@ -380,6 +385,7 @@ class AppPrefs {
         hapticLevel: _parseHapticLevel(m),
         showMacros: m[PrefKeys.showMacros] != '0',
         showWater: m[PrefKeys.showWater] != '0',
+        sounds: m[PrefKeys.sounds] != '0',
         waterGoalMl: (int.tryParse(m[PrefKeys.waterGoal] ?? '') ?? defaultWaterGoalMl)
             .clamp(500, 10000),
         waterGlassMl: (int.tryParse(m[PrefKeys.waterGlass] ?? '') ?? defaultWaterGlassMl)
