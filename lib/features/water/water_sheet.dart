@@ -13,6 +13,8 @@ import '../../core/widgets/app_icon.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/widgets/progress_ring.dart';
+import '../../core/widgets/rounded_animated_size.dart';
+import '../../core/widgets/rounded_dismissible.dart';
 import '../../core/widgets/sheet_scaffold.dart';
 import 'water_actions.dart';
 import 'water_widgets.dart';
@@ -161,10 +163,11 @@ class _WaterSheetState extends ConsumerState<WaterSheet> {
           Text(isSameDay(day, DateTime.now()) ? 'TODAY' : dayLabel(day).toUpperCase(),
               style: t.caption.copyWith(letterSpacing: 0.8)),
           const SizedBox(height: AppSpacing.sm),
-          AnimatedSize(
+          RoundedAnimatedSize(
             duration: AppMotion.normal,
             curve: AppMotion.easeOut,
             alignment: Alignment.topCenter,
+            borderRadius: AppRadii.tile, // the pill's own radius (40px tall)
             child: _undoText == null
                 ? const SizedBox(width: double.infinity)
                 : _UndoPill(
@@ -275,22 +278,22 @@ class _LogRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.type;
     final p = context.palette;
-    return Dismissible(
+    return RoundedDismissible(
       key: ValueKey('dismiss-water-${log.id}'),
       direction: DismissDirection.endToStart,
       dismissThresholds: const {DismissDirection.endToStart: AppGestures.deleteThreshold},
-      onUpdate: (d) {
-        if (d.reached && !d.previousReached) Haptics.light();
-      },
       onDismissed: (_) => onDelete(),
+      borderRadius: AppRadii.tile,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.lg),
-        decoration: BoxDecoration(color: p.accent, borderRadius: AppRadii.tile),
+        color: p.accent,
         child: AppIcon(AppIcons.trash, size: 20, color: p.onInk),
       ),
-      child: Padding(
+      // Opaque, so the sliding row covers the background behind it.
+      child: Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        decoration: BoxDecoration(color: p.surface, borderRadius: AppRadii.tile),
         child: Row(
           children: [
             const EmojiTile(AppEmoji.water, size: 36, radius: 11),

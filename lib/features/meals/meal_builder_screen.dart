@@ -14,6 +14,7 @@ import '../../core/widgets/count_up_text.dart';
 import '../../core/widgets/emoji.dart';
 import '../../core/widgets/macro_icons.dart';
 import '../../core/widgets/press_scale.dart';
+import '../../core/widgets/rounded_dismissible.dart';
 import '../../core/widgets/sheet_scaffold.dart';
 import '../add_food/add_food_sheet.dart';
 import '../../core/widgets/app_icon.dart';
@@ -124,6 +125,7 @@ class _MealBuilderScreenState extends ConsumerState<MealBuilderScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
+        clipBehavior: Clip.none, // see snackBarTheme
         content: Text('Removed ${removed.name}'),
         action: SnackBarAction(
           label: 'Undo',
@@ -409,19 +411,17 @@ class _IngredientRow extends StatelessWidget {
     final t = context.type;
     final p = context.palette;
 
-    return Dismissible(
+    return RoundedDismissible(
       key: ValueKey('dismiss-${item.name}-${item.serving}'),
       direction: DismissDirection.endToStart,
       dismissThresholds: const {DismissDirection.endToStart: AppGestures.deleteThreshold},
-      onUpdate: (d) {
-        if (d.reached && !d.previousReached) Haptics.light();
-      },
       onDismissed: (_) => onRemove(),
+      borderRadius: AppRadii.tile,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: AppSpacing.xl),
-        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        decoration: BoxDecoration(color: p.accent, borderRadius: AppRadii.tile),
+        color: p.accent,
         child: const AppIcon(AppIcons.trash, color: Colors.white),
       ),
       child: Container(

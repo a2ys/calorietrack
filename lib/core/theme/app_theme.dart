@@ -383,6 +383,11 @@ abstract final class AppTheme {
         backgroundColor: p.ink,
         contentTextStyle: type.body.copyWith(color: p.onInk),
         shape: RoundedRectangleBorder(borderRadius: AppRadii.tile),
+        // Flat, and every SnackBar passes clipBehavior: Clip.none: the
+        // floating bar sits in a ClipRect that cut its shadow off square and
+        // sliced the rounded top flat while it grew in. The theme has no clip
+        // setting, so it has to be set per SnackBar.
+        elevation: 0,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,

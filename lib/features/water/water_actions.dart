@@ -29,6 +29,7 @@ Future<int> logWater(
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(SnackBar(
+      clipBehavior: Clip.none, // see snackBarTheme
       duration: const Duration(seconds: 3),
       content: Text('Added ${formatWater(ml)} of water'),
       action: SnackBarAction(

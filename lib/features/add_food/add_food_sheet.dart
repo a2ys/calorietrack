@@ -14,6 +14,7 @@ import '../../core/db/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/calorie_calculator.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/widgets/rounded_animated_size.dart';
 import '../../core/widgets/add_circle.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/confirm_dialog.dart';
@@ -318,6 +319,7 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
     messenger
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
+        clipBehavior: Clip.none, // see snackBarTheme
         content: Text('Deleted ${entry.name}'),
         action: SnackBarAction(
           label: 'Undo',
@@ -830,10 +832,11 @@ class _Header extends StatelessWidget {
                 ),
             ],
           ),
-          AnimatedSize(
+          RoundedAnimatedSize(
             duration: AppMotion.normal,
             curve: AppMotion.spring,
             alignment: Alignment.topCenter,
+            borderRadius: AppRadii.tile,
             child: (pickerOpen && meal != null)
                 ? Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.md),
@@ -1203,10 +1206,11 @@ class _Footer extends StatelessWidget {
               onPressed: onCustom,
             ),
           ),
-          AnimatedSize(
+          RoundedAnimatedSize(
             duration: AppMotion.normal,
             curve: AppMotion.spring,
             alignment: Alignment.centerLeft,
+            borderRadius: AppRadii.chip,
             child: anyAdded
                 ? Padding(
                     padding: const EdgeInsets.only(left: AppSpacing.sm),
@@ -1833,10 +1837,11 @@ class _CustomFormState extends State<_CustomForm> {
             ],
           ),
           // Inline, as you type: why Add is disabled, and a one-tap fix.
-          AnimatedSize(
+          RoundedAnimatedSize(
             duration: AppMotion.normal,
             curve: AppMotion.springSoft,
             alignment: Alignment.topCenter,
+            borderRadius: AppRadii.tile,
             child: _mismatch == null
                 ? const SizedBox(width: double.infinity)
                 : Padding(

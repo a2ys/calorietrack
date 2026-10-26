@@ -127,7 +127,7 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
     Navigator.of(context).pop(false);
     messenger
       ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('Saved to My meals')));
+      ..showSnackBar(const SnackBar(clipBehavior: Clip.none, content: Text('Saved to My meals')));
   }
 
   void _edit() {
@@ -157,6 +157,7 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
     messenger
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
+        clipBehavior: Clip.none, // see snackBarTheme
         content: Text('Deleted ${saved.name}'),
         action: SnackBarAction(
           label: 'Undo',

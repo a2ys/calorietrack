@@ -1,11 +1,13 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// The app's sound cues. Files are Kenney "Interface Sounds" (CC0), in
-/// assets/sfx. Most cues fire through [Haptics], so anything that already
-/// has a haptic gets its sound for free; [water] is played directly.
+/// assets/sfx, converted to short mono 48 kHz PCM with the leading silence
+/// trimmed so they start on the tap. Most cues fire through [Haptics], so
+/// anything that already has a haptic gets its sound for free; [water] is
+/// played directly.
 enum Sfx {
-  /// Selection: steppers, chips, tabs. Fires constantly, so it is the
+  /// Selection: steppers, chips, tabs, wheels. Fires constantly, so it is the
   /// quietest and is throttled.
   tick('click_005.wav', 0.3),
 
@@ -29,47 +31,36 @@ enum Sfx {
 }
 
 /// Plays short UI sounds. Silent until [init] has run (so widget tests and
-/// previews never touch the audio plugin) and whenever [enabled] is false.
+/// previews never touch the platform) and whenever [enabled] is false.
 ///
-/// Sounds never interrupt the user's music: on Android they use the
-/// sonification stream with no audio focus, which also follows silent mode;
-/// on iOS the ambient session mixes with other audio and obeys the mute switch.
+/// On Android the cues are decoded once into a SoundPool (MainActivity.kt), so
+/// a play is one fire-and-forget message: nothing is awaited and no player is
+/// created per tap. They use the sonification stream with no audio focus, so
+/// the user's music keeps playing, and stay muted in silent or vibrate mode.
+/// Other platforms (web previews) are silent.
 abstract final class Sounds {
   /// User preference (Settings > Sounds). On by default.
   static bool enabled = true;
 
-  static final Map<Sfx, AudioPool> _pools = {};
+  static const _channel = MethodChannel('calorie/sfx');
+  static bool _loaded = false;
   static final Map<Sfx, DateTime> _lastPlayed = {};
 
-  /// The same cue never repeats faster than this (held steppers, fast taps).
+  /// The same cue never repeats faster than this (held steppers, fast wheels).
   static const Duration _minGap = Duration(milliseconds: 45);
 
+  static bool get _supported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// Loads the cues natively. Call after the first frame; taps before the
+  /// load finishes are silent.
   static Future<void> init() async {
-    final context = AudioContext(
-      android: const AudioContextAndroid(
-        contentType: AndroidContentType.sonification,
-        usageType: AndroidUsageType.assistanceSonification,
-        audioFocus: AndroidAudioFocus.none,
-      ),
-      iOS: AudioContextIOS(category: AVAudioSessionCategory.ambient),
-    );
+    if (_loaded || !_supported) return;
     try {
-      await AudioPlayer.global.setAudioContext(context);
-      for (final s in Sfx.values) {
-        _pools[s] = await AudioPool.create(
-          source: AssetSource('sfx/${s.file}'),
-          audioContext: context,
-          // Low latency (SoundPool on Android) so the sound lands with the
-          // haptic and the visual on the same frame.
-          playerMode: PlayerMode.lowLatency,
-          minPlayers: 1,
-          maxPlayers: s == Sfx.tick ? 4 : 2,
-        );
-      }
+      await _channel.invokeMethod<void>('load', [for (final s in Sfx.values) 'assets/sfx/${s.file}']);
+      _loaded = true;
     } catch (e) {
       // No audio is better than a crash; the app works fine without it.
       debugPrint('Sounds disabled: $e');
-      _pools.clear();
     }
   }
 
@@ -84,6 +75,6 @@ abstract final class Sounds {
     if (last != null && now.difference(last) < _minGap) return;
     _lastPlayed[s] = now;
     debugOnPlay?.call(s);
-    _pools[s]?.start(volume: s.volume).ignore();
+    if (_loaded) _channel.invokeMethod<void>('play', [s.index, s.volume]).ignore();
   }
 }

@@ -181,6 +181,7 @@ class MealsScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(
+        clipBehavior: Clip.none, // see snackBarTheme
         content: Text('Added $name to ${meal.label.toLowerCase()} · ${dayLabel(day).toLowerCase()}'),
         action: SnackBarAction(
           label: 'Undo',

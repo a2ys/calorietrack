@@ -21,12 +21,13 @@ Future<void> main() async {
           LicenseEntryWithLineBreaks([name], '$use by $author.\n\nLicense: $license'),
       ]));
 
-  // Loads the sound cues in the background; taps before it finishes are silent.
-  Sounds.init();
-
   final db = AppDatabase.open();
   if (_seed) await seedSampleData(db);
   final onboarded = await db.getProfile() != null;
+
+  // Load the sound cues once the first frame is up so they never delay
+  // startup; taps before the load finishes are silent.
+  WidgetsBinding.instance.addPostFrameCallback((_) => Sounds.init());
 
   runApp(
     ProviderScope(

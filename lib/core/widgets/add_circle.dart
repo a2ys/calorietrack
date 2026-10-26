@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../utils/haptics.dart';
 import 'press_scale.dart';
 import 'app_icon.dart';
+import 'rounded_animated_size.dart';
 
 /// The round "+" on food rows. Once something was added it grows into a
 /// "− 2 +" stepper (when [onRemove] is given) so a mis-tap can be taken back
@@ -21,10 +22,11 @@ class AddCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final stepper = count > 0 && onRemove != null;
 
-    return AnimatedSize(
+    return RoundedAnimatedSize(
       duration: AppMotion.slow,
       curve: AppMotion.springSoft,
       alignment: Alignment.centerRight,
+      borderRadius: AppRadii.chip,
       child: AnimatedSwitcher(
         duration: AppMotion.fast,
         switchInCurve: AppMotion.easeOut,

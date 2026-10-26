@@ -10,6 +10,7 @@ import '../utils/haptics.dart';
 import 'app_card.dart';
 import 'emoji.dart';
 import 'macro_icons.dart';
+import 'rounded_dismissible.dart';
 import 'app_icon.dart';
 
 /// A logged food as a card. Tap or swipe right to edit, swipe left to delete
@@ -27,26 +28,21 @@ class EntryTile extends ConsumerWidget {
     Widget swipeBackground({required bool edit}) => Container(
           alignment: edit ? Alignment.centerLeft : Alignment.centerRight,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-          decoration: BoxDecoration(
-            color: edit ? p.ink : p.accent,
-            borderRadius: AppRadii.card,
-          ),
+          color: edit ? p.ink : p.accent,
           child: AppIcon(
             edit ? AppIcons.pencil : AppIcons.trash,
             color: p.onInk,
           ),
         );
 
-    return Dismissible(
+    return RoundedDismissible(
       key: ValueKey('entry-${entry.id}'),
+      borderRadius: AppRadii.card,
       background: swipeBackground(edit: true),
       secondaryBackground: swipeBackground(edit: false),
       dismissThresholds: const {
         DismissDirection.startToEnd: AppGestures.actionThreshold,
         DismissDirection.endToStart: AppGestures.deleteThreshold,
-      },
-      onUpdate: (d) {
-        if (d.reached && !d.previousReached) Haptics.light();
       },
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
@@ -63,6 +59,7 @@ class EntryTile extends ConsumerWidget {
           ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
+              clipBehavior: Clip.none, // see snackBarTheme
               content: Text('Deleted ${entry.name}'),
               action: SnackBarAction(
                 label: 'Undo',
