@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:calorie_app/core/data/photo_meal_service.dart';
 import 'package:calorie_app/core/db/database.dart';
