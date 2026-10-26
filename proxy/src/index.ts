@@ -129,6 +129,9 @@ export default {
         ],
       });
 
+      // Visible with `npx wrangler tail`; useful for estimating cost per photo.
+      console.log(JSON.stringify({ usage: response.usage, stop: response.stop_reason }));
+
       if (response.stop_reason === "refusal") {
         return fail(422, "refused", "This photo couldn't be analysed. Try another one.");
       }
@@ -142,7 +145,14 @@ export default {
       if (error instanceof Anthropic.RateLimitError) {
         return fail(503, "busy", "The service is busy. Try again in a moment.");
       }
+      if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+        return fail(503, "not_set_up", "Photo logging isn't set up correctly (API key). Check the proxy's ANTHROPIC_API_KEY.");
+      }
       if (error instanceof Anthropic.BadRequestError) {
+        // An empty prepaid balance also comes back as a 400; the message is the only way to tell.
+        if (/credit balance/i.test(error.message)) {
+          return fail(503, "no_credit", "Photo logging is out of API credit. Add credit in the Anthropic console.");
+        }
         return fail(400, "bad_image", "That photo couldn't be read. Try another one.");
       }
       if (error instanceof Anthropic.APIError) {
