@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
@@ -294,6 +295,17 @@ class AppDatabase extends _$AppDatabase {
         PrefsCompanion.insert(key: key, value: value),
       );
 
+  /// A random id for this install, made on first use (rate limits on the
+  /// photo proxy). Not tied to the user or the device.
+  Future<String> installId() async {
+    final existing = (await getPrefs())[PrefKeys.installId];
+    if (existing != null) return existing;
+    final r = Random.secure();
+    final id = List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    await setPref(PrefKeys.installId, id);
+    return id;
+  }
+
   // -------------------------------------------------------------- misc
 
   Future<void> deleteEverything() async {
@@ -350,6 +362,7 @@ abstract final class PrefKeys {
   static const waterGlass = 'water_glass_ml';
   static const calorieView = 'calorie_view';
   static const sounds = 'sounds';
+  static const installId = 'install_id';
 }
 
 /// How the big number on Today reads.

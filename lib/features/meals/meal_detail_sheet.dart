@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,6 +56,9 @@ class MealDetailSheet extends ConsumerStatefulWidget {
     required this.name,
     required this.emoji,
     required this.items,
+    this.photo,
+    this.healthScore,
+    this.onFix,
     this.saved,
     this.day,
     this.mealType,
@@ -62,6 +67,12 @@ class MealDetailSheet extends ConsumerStatefulWidget {
   final String name;
   final String emoji;
   final List<MealItem> items;
+
+  /// Set for a meal read from a photo: shown on top, with its [healthScore]
+  /// (1-10) and a "Fix results" button ([onFix]).
+  final Uint8List? photo;
+  final int? healthScore;
+  final VoidCallback? onFix;
   final SavedMeal? saved;
   final DateTime? day;
   final MealType? mealType;
@@ -181,6 +192,16 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.photo != null) ...[
+            ClipRRect(
+              borderRadius: AppRadii.card,
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Image.memory(widget.photo!, fit: BoxFit.cover, gaplessPlayback: true),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           // Totals
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -223,6 +244,10 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          if (widget.healthScore != null) ...[
+            _HealthScore(score: widget.healthScore!),
+            const SizedBox(height: AppSpacing.lg),
+          ],
 
           // Portion
           Row(
@@ -302,8 +327,63 @@ class _MealDetailSheetState extends ConsumerState<MealDetailSheet> {
                 ),
               ],
             )
+          else if (widget.onFix != null)
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(label: 'Fix results', icon: AppIcons.pencil, style: AppButtonStyle.outline, onPressed: widget.onFix),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: AppButton(label: 'Save meal', icon: AppIcons.bookmark, style: AppButtonStyle.outline, onPressed: _saveCopy),
+                ),
+              ],
+            )
           else
             AppButton(label: 'Save to my meals', icon: AppIcons.bookmark, style: AppButtonStyle.outline, onPressed: _saveCopy),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Health score 7 / 10" over a filling bar.
+class _HealthScore extends StatelessWidget {
+  const _HealthScore({required this.score});
+  final int score;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.type;
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: AppRadii.tile),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Health score', style: t.bodyStrong)),
+              Text('$score', style: t.numeralS),
+              Text(' / 10', style: t.caption),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: AppRadii.chip,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: score / 10),
+              duration: AppMotion.springDuration,
+              curve: AppMotion.springSoft,
+              builder: (context, v, _) => LinearProgressIndicator(
+                value: v,
+                minHeight: 6,
+                color: p.ink,
+                backgroundColor: p.track,
+              ),
+            ),
+          ),
         ],
       ),
     );

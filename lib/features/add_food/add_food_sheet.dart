@@ -4,6 +4,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/data/photo_meal_service.dart';
 import '../../core/data/barcode_lookup.dart';
 import '../../core/data/common_foods.dart';
 import '../../core/data/food.dart';
@@ -25,6 +26,7 @@ import '../../core/widgets/macro_icons.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/widgets/segmented_pills.dart';
 import '../../core/widgets/sheet_scaffold.dart';
+import '../scan/photo_meal_sheet.dart';
 import '../scan/barcode_scanner_page.dart';
 import '../meals/meal_detail_sheet.dart';
 import '../../core/widgets/app_icon.dart';
@@ -383,6 +385,13 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
     _scrollToTop();
   }
 
+  /// Logs a whole plate from a photo; closes Add food once it's logged.
+  Future<void> _photo() async {
+    FocusScope.of(context).unfocus();
+    final logged = await logMealFromPhoto(context, ref.read(databaseProvider), day: widget.day);
+    if (logged && mounted) Navigator.of(context).pop();
+  }
+
   /// Scans a barcode: a known product opens ready to weigh; an unknown one
   /// opens the custom form, and what's typed there is kept for next time.
   Future<void> _scan() async {
@@ -585,6 +594,8 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
                     selected: _query.isEmpty ? _chip : null,
                     onChip: (c) => _selectChip(chips, c),
                     onScan: _scan,
+                    // Logging a plate isn't an ingredient pick.
+                    onPhoto: PhotoMealService.isConfigured && !_picking ? _photo : null,
                   ),
                 ),
               ),
@@ -942,9 +953,13 @@ class _SearchAndChips extends StatelessWidget {
     required this.selected,
     required this.onChip,
     required this.onScan,
+    required this.onPhoto,
   });
 
   final VoidCallback onScan;
+
+  /// Null hides the camera (photo logging not set up, or picking ingredients).
+  final VoidCallback? onPhoto;
   final TextEditingController controller;
   final List<_Chip> chips;
   final Map<_Chip, GlobalKey> chipKeys;
@@ -998,7 +1013,18 @@ class _SearchAndChips extends StatelessWidget {
                     },
                     child: AppIcon(AppIcons.clearFill, size: 20, color: p.textTertiary),
                   )
-                else
+                else ...[
+                  if (onPhoto != null)
+                    PressScale(
+                      semanticLabel: 'Log a meal from a photo',
+                      scale: 0.88,
+                      onTap: onPhoto,
+                      child: SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: AppIcon(AppIcons.camera, size: 22, color: p.textPrimary),
+                      ),
+                    ),
                   PressScale(
                     semanticLabel: 'Scan a barcode',
                     scale: 0.88,
@@ -1010,6 +1036,7 @@ class _SearchAndChips extends StatelessWidget {
                       child: AppIcon(AppIcons.barcode, size: 22, color: p.textPrimary),
                     ),
                   ),
+                ],
               ],
             ),
           ),

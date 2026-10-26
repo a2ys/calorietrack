@@ -6,7 +6,7 @@
 //
 // POST /analyze
 //   headers: Authorization: Bearer <APP_TOKEN>, X-Install-Id: <random id per install>
-//   body:    { "image": "<base64 JPEG>", "localTime": "13:05", "note"?: "extra context" }
+//   body:    { "image": "<base64>", "mediaType"?: "image/jpeg", "localTime": "13:05", "note"?: "what the last answer got wrong" }
 //   200:     Meal (see MEAL_SCHEMA)
 //   4xx/5xx: { "error": "<code>", "message": "<readable>" }
 
@@ -20,6 +20,8 @@ export interface Env {
 }
 
 const MODEL = "claude-opus-5-5";
+
+const MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 /** Largest accepted photo, as base64 characters (~6 MB of JPEG). */
 const MAX_IMAGE_CHARS = 8_000_000;
@@ -84,7 +86,7 @@ export default {
     const { success } = await env.LIMITER.limit({ key: installId });
     if (!success) return fail(429, "rate_limited", "Too many photos at once. Try again in a minute.");
 
-    let body: { image?: unknown; localTime?: unknown; note?: unknown };
+    let body: { image?: unknown; mediaType?: unknown; localTime?: unknown; note?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -94,6 +96,7 @@ export default {
     if (!image || image.length > MAX_IMAGE_CHARS) {
       return fail(400, "bad_image", "Send one JPEG photo, base64-encoded, under about 6 MB.");
     }
+    const mediaType = MEDIA_TYPES.find((t) => t === body.mediaType) ?? "image/jpeg";
     const localTime = typeof body.localTime === "string" ? body.localTime.slice(0, 5) : "unknown";
     const note = typeof body.note === "string" ? body.note.slice(0, 300) : "";
 
@@ -114,10 +117,12 @@ export default {
           {
             role: "user",
             content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
+              { type: "image", source: { type: "base64", media_type: mediaType, data: image } },
               {
                 type: "text",
-                text: `Local time: ${localTime}.${note ? ` Note from the user: ${note}` : ""}\nWhat is in this meal?`,
+                text: note
+                  ? `Local time: ${localTime}. A previous estimate of this photo was wrong. The user says: ${note}\nEstimate the meal again with that correction.`
+                  : `Local time: ${localTime}.\nWhat is in this meal?`,
               },
             ],
           },

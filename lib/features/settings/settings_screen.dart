@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/data/photo_meal_service.dart';
 import '../../core/db/database.dart';
 import '../../core/db/providers.dart';
 import '../../core/router/app_router.dart';
@@ -288,7 +289,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Everything is stored on this device. No account, no cloud. Scanning a barcode sends only its number to Open Food Facts.',
+            'Everything is stored on this device. No account, no cloud. Scanning a barcode sends only its number to Open Food Facts.'
+            '${PhotoMealService.isConfigured ? ' Photos you log are sent to Claude (Anthropic) to estimate nutrition.' : ''}',
             style: t.caption,
             textAlign: TextAlign.center,
           ),

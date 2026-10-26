@@ -28,6 +28,8 @@ abstract final class AppIcons {
   static const bookmark = AppIconData('bold-bookmark-simple');
   static const clearFill = AppIconData('fill-x-circle');
   static const barcode = AppIconData('bold-barcode');
+  static const camera = AppIconData('bold-camera');
+  static const image = AppIconData('bold-image');
   static const lightning = AppIconData('bold-lightning');
   static const lightningFill = AppIconData('fill-lightning');
 
