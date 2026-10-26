@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data/photo_meal_service.dart';
+import '../../core/data/label_scanner.dart';
 import '../../core/data/barcode_lookup.dart';
 import '../../core/data/common_foods.dart';
 import '../../core/data/food.dart';
@@ -268,6 +269,29 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
     final existing = widget.editing;
     final t = Totals(kcal: d.kcal, protein: d.protein, carbs: d.carbs, fat: d.fat);
     Food? picked;
+
+    // Read off a label: a proper packaged food, saved (and shared, after a
+    // barcode miss), then opened on grams to choose how much was eaten.
+    final labelGrams = d.grams;
+    if (labelGrams != null && existing == null) {
+      final code = _newBarcode;
+      final perLabel = Food(
+        name: d.name,
+        emoji: code != null ? AppEmoji.packaged : AppEmoji.custom,
+        group: FoodGroup.other,
+        serving: '$labelGrams g',
+        grams: labelGrams,
+        kcal: d.kcal,
+        protein: d.protein,
+        carbs: d.carbs,
+        fat: d.fat,
+      );
+      final portion = d.servingGrams;
+      final food = portion != null && portion != labelGrams ? perLabel.withGrams(portion) : perLabel;
+      if (code != null) await (await BarcodeLookup.forApp(db)).contribute(code, food);
+      if (mounted) _openDetail(food, byWeight: true);
+      return;
+    }
 
     if (existing != null) {
       await db.updateEntry(existing.copyWith(
@@ -1775,8 +1799,15 @@ class _Draft {
     required this.carbs,
     required this.fat,
     required this.saveToMine,
+    this.grams,
+    this.servingGrams,
   });
 
+  /// Set when the values came off a label: the weight they describe (100 for
+  /// "per 100 g"), so any weight can be logged. [servingGrams] is the label's
+  /// own serving, used as the starting portion.
+  final int? grams;
+  final int? servingGrams;
   final String name;
   final int kcal;
   final double protein;
@@ -1819,6 +1850,13 @@ class _CustomFormState extends State<_CustomForm> {
   late final _fat = TextEditingController(text: _fmt(widget.editing?.fat));
   bool _saveToMine = false;
   bool _busy = false;
+  bool _scanning = false;
+  String? _scanError;
+
+  /// Set once a label filled the fields: the weight its values describe
+  /// (100 for "per 100 g") and its serving size.
+  int? _labelGrams;
+  int? _labelServing;
 
   static String _fmt(double? v) =>
       (v == null || v == 0) ? '' : (v == v.roundToDouble() ? v.round().toString() : v.toString());
@@ -1884,9 +1922,42 @@ class _CustomFormState extends State<_CustomForm> {
       protein: _num(_protein),
       carbs: _num(_carbs),
       fat: _num(_fat),
-      saveToMine: _saveToMine,
+      saveToMine: _saveToMine && _labelGrams == null,
+      grams: _labelGrams,
+      servingGrams: _labelServing,
     ));
     if (mounted) setState(() => _busy = false);
+  }
+
+  /// Fills the fields from a photo of the nutrition label.
+  Future<void> _scanLabel() async {
+    FocusScope.of(context).unfocus();
+    Haptics.light();
+    setState(() {
+      _scanning = true;
+      _scanError = null;
+    });
+    final scan = await scanNutritionLabel();
+    if (!mounted) return;
+    setState(() => _scanning = false);
+    switch (scan) {
+      case LabelRead(:final nutrition):
+        Haptics.success();
+        String g(double v) => _fmt((v * 10).roundToDouble() / 10);
+        setState(() {
+          _kcal.text = '${nutrition.kcal.round()}';
+          _protein.text = g(nutrition.protein);
+          _carbs.text = g(nutrition.carbs);
+          _fat.text = g(nutrition.fat);
+          _labelGrams = nutrition.per100 ? 100 : nutrition.servingGrams;
+          _labelServing = nutrition.servingGrams;
+        });
+      case LabelUnreadable():
+        Haptics.warning();
+        setState(() => _scanError = 'Couldn’t read that label. Try again flat, close up and in good light, or type it in.');
+      case LabelCancelled():
+        break;
+    }
   }
 
   @override
@@ -1908,6 +1979,33 @@ class _CustomFormState extends State<_CustomForm> {
         children: [
           if (widget.note != null) ...[
             Text(widget.note!, style: t.label),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          if (widget.editing == null) ...[
+            AppButton(
+              label: _scanning ? 'Reading the label…' : 'Scan the nutrition label',
+              icon: AppIcons.camera,
+              style: AppButtonStyle.outline,
+              onPressed: _scanning || _busy ? null : _scanLabel,
+            ),
+            RoundedAnimatedSize(
+              duration: AppMotion.normal,
+              curve: AppMotion.springSoft,
+              alignment: Alignment.topCenter,
+              borderRadius: AppRadii.tile,
+              child: _scanError != null || _labelGrams != null
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: Text(
+                        _scanError ??
+                            (_labelGrams == 100
+                                ? 'Filled from the label, per 100 g. Check it, name it, and pick how much you had next.'
+                                : 'Filled from the label, per serving ($_labelGrams g). Check it and name it.'),
+                        style: t.label.copyWith(color: _scanError != null ? p.accent : p.textSecondary),
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
             const SizedBox(height: AppSpacing.md),
           ],
           TextField(
@@ -1960,7 +2058,7 @@ class _CustomFormState extends State<_CustomForm> {
                     ),
                   ),
           ),
-          if (widget.allowSave) ...[
+          if (widget.allowSave && _labelGrams == null) ...[
             const SizedBox(height: AppSpacing.md),
             PressScale(
               onTap: () {
@@ -1990,7 +2088,7 @@ class _CustomFormState extends State<_CustomForm> {
           ],
           const SizedBox(height: AppSpacing.lg),
           AppButton(
-            label: widget.submitLabel,
+            label: _labelGrams != null && widget.editing == null ? 'Next: how much?' : widget.submitLabel,
             onPressed: _valid && !_busy ? _submit : null,
           ),
           if (widget.onDelete != null) ...[
