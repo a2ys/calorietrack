@@ -95,6 +95,20 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
 
+          // ----------------------------------------------------- sync (soon)
+          const SizedBox(height: AppSpacing.md),
+          const StaggeredEntrance(
+            index: 1,
+            child: _Group(children: [
+              _Row(
+                emoji: '☁️',
+                title: 'Sync data',
+                subtitle: 'Coming soon',
+                dimmed: true,
+              ),
+            ]),
+          ),
+
           // -------------------------------------------------------- goals
           const _SectionLabel('Your plan'),
           _Group(children: [
@@ -373,6 +387,7 @@ class _Row extends StatelessWidget {
     this.trailing,
     this.bottom,
     this.chevron = false,
+    this.dimmed = false,
     this.onTap,
   });
 
@@ -382,6 +397,9 @@ class _Row extends StatelessWidget {
   final Widget? trailing;
   final Widget? bottom;
   final bool chevron;
+
+  /// Greyed out and not tappable (a feature that isn't there yet).
+  final bool dimmed;
   final VoidCallback? onTap;
 
   @override
@@ -419,6 +437,7 @@ class _Row extends StatelessWidget {
       ),
     );
 
+    if (dimmed) return Opacity(opacity: 0.45, child: row);
     return onTap == null ? row : PressScale(scale: 0.99, onTap: onTap, child: row);
   }
 }

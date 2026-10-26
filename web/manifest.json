@@ -1,6 +1,6 @@
 {
-    "name": "calorie_app",
-    "short_name": "calorie_app",
+    "name": "CalTracker",
+    "short_name": "CalTracker",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

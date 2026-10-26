@@ -65,7 +65,7 @@ class _LicensesSheet extends StatelessWidget {
           PressScale(
             onTap: () {
               Haptics.light();
-              showLicensePage(context: context, applicationName: 'Calorie');
+              showLicensePage(context: context, applicationName: 'CalTracker');
             },
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.lg),

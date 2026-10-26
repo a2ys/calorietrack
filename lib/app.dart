@@ -8,6 +8,7 @@ import 'core/db/providers.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/haptics.dart';
 import 'core/utils/sounds.dart';
+import 'core/widgets/splash_overlay.dart';
 
 class CalorieApp extends ConsumerWidget {
   const CalorieApp({super.key, required this.router});
@@ -31,7 +32,7 @@ class CalorieApp extends ConsumerWidget {
     };
 
     return MaterialApp.router(
-      title: 'Calorie',
+      title: 'CalTracker',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -40,6 +41,10 @@ class CalorieApp extends ConsumerWidget {
       themeAnimationDuration: AppMotion.slow,
       themeAnimationCurve: AppMotion.easeOut,
       routerConfig: router,
+      builder: (context, child) => Stack(
+        textDirection: TextDirection.ltr,
+        children: [child ?? const SizedBox.shrink(), const SplashOverlay()],
+      ),
     );
   }
 }
