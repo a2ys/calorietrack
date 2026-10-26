@@ -9,6 +9,12 @@
 //   The app asks before opening the camera, so a switched-off feature costs
 //   nothing. Toggle with PHOTO_ENABLED in wrangler.toml, then `npm run deploy`.
 //
+// GET /product/<barcode>   (same Authorization header)
+//   200: Product, 404 when nobody has added it
+// PUT /product/<barcode>   body: Product
+//   Products typed in after a barcode miss, shared by every install so one
+//   person's entry fixes the scan for everyone. Independent of PHOTO_ENABLED.
+//
 // POST /analyze
 //   headers: Authorization: Bearer <APP_TOKEN>, X-Install-Id: <random id per install>
 //   body:    { "image": "<base64>", "mediaType"?: "image/jpeg", "localTime": "13:05", "note"?: "what the last answer got wrong" }
@@ -24,6 +30,35 @@ export interface Env {
   LIMITER: RateLimit;
   /** "true" turns photo logging on for every install; anything else shows OFF_MESSAGE. */
   PHOTO_ENABLED?: string;
+  PRODUCTS: KVNamespace;
+}
+
+/** One serving of a packaged food, as the app's ScannedFoods row stores it. */
+interface Product {
+  name: string;
+  serving: string;
+  grams: number | null;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+/** A sane product, or null. Keeps junk and typos out of everyone's scans. */
+function readProduct(v: unknown): Product | null {
+  if (typeof v !== "object" || v === null) return null;
+  const o = v as Record<string, unknown>;
+  const num = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= max ? x : null);
+  const name = typeof o.name === "string" ? o.name.trim().slice(0, 120) : "";
+  const serving = typeof o.serving === "string" ? o.serving.trim().slice(0, 40) : "";
+  const grams = o.grams === null || o.grams === undefined ? null : num(o.grams, 5000);
+  const kcal = num(o.kcal, 5000);
+  const protein = num(o.protein, 1000);
+  const carbs = num(o.carbs, 1000);
+  const fat = num(o.fat, 1000);
+  if (!name || !serving || kcal === null || protein === null || carbs === null || fat === null) return null;
+  if (o.grams !== null && o.grams !== undefined && grams === null) return null;
+  return { name, serving, grams: grams === null ? null : Math.round(grams), kcal: Math.round(kcal), protein, carbs, fat };
 }
 
 const OFF_MESSAGE =
@@ -89,11 +124,35 @@ export default {
     if (request.method === "GET" && url.pathname === "/status") {
       return json(enabled ? { enabled } : { enabled, message: OFF_MESSAGE });
     }
-    if (request.method !== "POST" || url.pathname !== "/analyze") {
-      return fail(404, "not_found", "Use GET /status or POST /analyze.");
-    }
     if (request.headers.get("authorization") !== `Bearer ${env.APP_TOKEN}`) {
       return fail(401, "unauthorized", "Missing or wrong app token.");
+    }
+
+    const product = url.pathname.match(/^\/product\/(\d{8,14})$/);
+    if (product) {
+      const key = `p:${product[1]}`;
+      if (request.method === "GET") {
+        const stored = await env.PRODUCTS.get(key, "json");
+        return stored ? json(stored) : fail(404, "not_found", "Nobody has added this product yet.");
+      }
+      if (request.method === "PUT") {
+        const { success } = await env.LIMITER.limit({ key: request.headers.get("x-install-id") ?? "anonymous" });
+        if (!success) return fail(429, "rate_limited", "Too many at once. Try again in a minute.");
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return fail(400, "bad_request", "Body must be JSON.");
+        }
+        const p = readProduct(body);
+        if (!p) return fail(400, "bad_product", "That product doesn't look right.");
+        await env.PRODUCTS.put(key, JSON.stringify(p));
+        return json(p);
+      }
+    }
+
+    if (request.method !== "POST" || url.pathname !== "/analyze") {
+      return fail(404, "not_found", "Use GET /status, GET or PUT /product/<barcode>, or POST /analyze.");
     }
 
     if (!enabled) return fail(503, "off", OFF_MESSAGE);

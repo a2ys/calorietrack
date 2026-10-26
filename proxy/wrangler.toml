@@ -6,6 +6,11 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Products friends typed in after a barcode miss, shared with every install.
+[[kv_namespaces]]
+binding = "PRODUCTS"
+id = "24508e7fe2cc4483a57570dc7b9213eb"
+
 [vars]
 # "true" turns photo logging on in every install (no app update needed).
 # Off until there's API credit; the app then shows a friendly note instead.

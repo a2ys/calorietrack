@@ -296,7 +296,7 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
 
     final code = _newBarcode;
     if (code != null && existing == null) {
-      await BarcodeLookup(db).remember(
+      await (await BarcodeLookup.forApp(db)).contribute(
         code,
         Food(
           name: d.name,
@@ -396,10 +396,9 @@ class _AddFoodSheetState extends ConsumerState<AddFoodSheet>
   /// opens the custom form, and what's typed there is kept for next time.
   Future<void> _scan() async {
     FocusScope.of(context).unfocus();
-    final result = await showBarcodeScanner(
-      context,
-      lookup: BarcodeLookup(ref.read(databaseProvider)).lookup,
-    );
+    final lookup = await BarcodeLookup.forApp(ref.read(databaseProvider));
+    if (!mounted) return;
+    final result = await showBarcodeScanner(context, lookup: lookup.lookup);
     if (!mounted || result == null) return;
     switch (result) {
       case BarcodeFound(:final food):

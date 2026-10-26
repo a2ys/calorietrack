@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../db/models.dart';
 import '../widgets/emoji.dart';
+import 'app_proxy.dart';
 
 /// A meal read from a photo: the plate as items the meal sheet can show,
 /// scale and log.
@@ -54,10 +55,7 @@ class PhotoMealFailed extends PhotoMealResult {
 class PhotoMealService {
   PhotoMealService({required this.installId, http.Client? client}) : _client = client ?? http.Client();
 
-  static const _url = String.fromEnvironment('PHOTO_PROXY_URL');
-  static const _token = String.fromEnvironment('PHOTO_PROXY_TOKEN');
-
-  static bool get isConfigured => _url.isNotEmpty && _token.isNotEmpty;
+  static bool get isConfigured => AppProxy.isConfigured;
 
   /// Why photo logging is switched off on the server right now (it can be
   /// paused there, e.g. out of API credit), or null when it's on. Asked
@@ -66,7 +64,7 @@ class PhotoMealService {
   static Future<String?> offReason({http.Client? client}) async {
     final c = client ?? http.Client();
     try {
-      final res = await c.get(Uri.parse('$_url/status')).timeout(const Duration(seconds: 5));
+      final res = await c.get(Uri.parse('${AppProxy.url}/status')).timeout(const Duration(seconds: 5));
       final body = jsonDecode(utf8.decode(res.bodyBytes));
       if (res.statusCode != 200 || body is! Map<String, dynamic> || body['enabled'] != false) return null;
       final message = body['message'];
@@ -91,12 +89,8 @@ class PhotoMealService {
     try {
       res = await _client
           .post(
-            Uri.parse('$_url/analyze'),
-            headers: {
-              'Authorization': 'Bearer $_token',
-              'X-Install-Id': installId,
-              'content-type': 'application/json',
-            },
+            Uri.parse('${AppProxy.url}/analyze'),
+            headers: AppProxy.headers(installId),
             body: jsonEncode({
               'image': base64Encode(image),
               'mediaType': mediaTypeOf(image),

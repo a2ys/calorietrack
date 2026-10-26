@@ -120,5 +120,70 @@ void main() {
       await lookup.remember('42', typed);
       expect((await lookup.lookup('42') as BarcodeFound).food.kcal, 480);
     });
+
+    test('tries the other form of the code (UPC-A vs EAN-13)', () async {
+      expect(BarcodeLookup.variants('012345678905'), ['012345678905', '0012345678905']);
+      expect(BarcodeLookup.variants('0012345678905'), ['0012345678905', '012345678905']);
+      expect(BarcodeLookup.variants('8901234567890'), ['8901234567890']);
+
+      final asked = <String>[];
+      final lookup = BarcodeLookup(db, client: MockClient((req) async {
+        asked.add(req.url.pathSegments.last);
+        return req.url.path.contains('0012345678905')
+            ? http.Response(jsonEncode(product()), 200)
+            : http.Response('{"status":0}', 404);
+      }));
+      final r = await lookup.lookup('012345678905');
+      expect((r as BarcodeFound).barcode, '012345678905');
+      expect(asked, ['012345678905.json', '0012345678905.json']);
+      // Cached under the scanned code.
+      expect(await db.getScannedFood('012345678905'), isNotNull);
+    });
+
+    test('after an Open Food Facts miss, friends\' shared products are checked', () async {
+      final shared = SharedProducts(
+        installId: 'me',
+        client: MockClient((req) async {
+          expect(req.url.path, '/product/8901234567890');
+          expect(req.headers['X-Install-Id'], 'me');
+          return http.Response(
+            jsonEncode({'name': 'Haldiram Bhujia', 'serving': '30 g', 'grams': 30, 'kcal': 165, 'protein': 2, 'carbs': 15, 'fat': 11}),
+            200,
+          );
+        }),
+      );
+      final lookup = BarcodeLookup(db, shared: shared, client: MockClient((_) async => http.Response('{"status":0}', 404)));
+      final r = await lookup.lookup('8901234567890');
+      expect((r as BarcodeFound).food.name, 'Haldiram Bhujia');
+      expect(r.food.withGrams(60).kcal, 330);
+      expect(await db.getScannedFood('8901234567890'), isNotNull);
+    });
+
+    test('a typed-in product is shared with friends', () async {
+      Map<String, dynamic>? sent;
+      final shared = SharedProducts(
+        installId: 'me',
+        client: MockClient((req) async {
+          if (req.method == 'PUT') sent = jsonDecode(req.body) as Map<String, dynamic>;
+          return http.Response('{}', req.method == 'PUT' ? 200 : 404);
+        }),
+      );
+      final lookup = BarcodeLookup(db, shared: shared, client: MockClient((_) async => http.Response('{"status":0}', 404)));
+      final miss = await lookup.lookup('8901234567890');
+      expect(miss, isA<BarcodeNotFound>());
+
+      final typed = SharedProducts.foodFromJson({'name': 'Local chikki', 'serving': '1 serving', 'grams': null, 'kcal': 120, 'protein': 3, 'carbs': 15, 'fat': 5})!;
+      await lookup.contribute('8901234567890', typed);
+      expect(sent?['name'], 'Local chikki');
+      expect(sent?['grams'], isNull);
+      expect((await lookup.lookup('8901234567890') as BarcodeFound).food.kcal, 120);
+    });
+
+    test('an unreachable shared list is just a miss, not an error', () async {
+      final shared = SharedProducts(installId: 'me', client: MockClient((_) async => throw http.ClientException('down')));
+      final lookup = BarcodeLookup(db, shared: shared, client: MockClient((_) async => http.Response('{"status":0}', 404)));
+      expect(await lookup.lookup('8901234567890'), isA<BarcodeNotFound>());
+      expect(SharedProducts.foodFromJson({'name': '', 'serving': 'x', 'kcal': 1}), isNull);
+    });
   });
 }
