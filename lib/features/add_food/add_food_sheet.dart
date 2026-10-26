@@ -1996,7 +1996,9 @@ class _CustomFormState extends State<_CustomForm> {
               borderRadius: AppRadii.tile,
               child: _scanError != null || _labelGrams != null
                   ? Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      // Inset from the corners: the rounded clip would slice the
+                      // first letter of the last line.
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.xs),
                       child: Text(
                         _scanError ??
                             (_labelGrams == 100
